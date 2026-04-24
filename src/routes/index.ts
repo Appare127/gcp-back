@@ -9,12 +9,33 @@
 // 不該做什麼：絕對不應該在這裡寫任何「讀寫資料庫」或「判斷商業邏輯」的程式碼。
 
 import { Router } from 'express';
-import { sayHello, registerUser } from '../controllers/helloController';
+import {
+  sayHello,
+  registerUser,
+  loginUser
+} from '../controllers/userController';
+import { authenticateToken } from '../middlewares/authMiddleware';
+import { createArticle } from '../controllers/articleController';
 
 const router = Router();
 
 // 定義 GET /api/hello 網址，並指派給 sayHello 這個 Controller 處理
 router.get('/hello', sayHello);
 router.post('/register', registerUser);
+router.post('/login', loginUser);
+
+// 使用 POST 方法來「建立 (Create)」一支「文章 (Article)」
+router.post('/articles', authenticateToken, createArticle);
+
+// 需要通行證：查看個人資料 (在路徑與 Controller 中間插入 authenticateToken)
+router.get('/me', authenticateToken, (req, res) => {
+  // 因為 authenticateToken 通過了，我們可以直接拿到剛剛塞進去的 user 資訊
+  const user = (req as any).user;
+  res.status(200).json({
+    success: true,
+    message: '這是您的隱私資料',
+    user: user
+  });
+});
 
 export default router;

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import routes from './routes';
+import { globalErrorHandler } from './middlewares/errorMiddleware';
 
 const app = express();
 
@@ -10,5 +11,8 @@ app.use(express.json()); // 支援解析 JSON 格式的 Request Body
 
 // 掛載 API 路由，所有的路由都會加上 /api 前綴
 app.use('/api', routes);
+
+// 掛載全域錯誤處理中間件（放在所有路由後面）
+app.use(globalErrorHandler);
 
 export default app;

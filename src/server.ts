@@ -7,5 +7,7 @@ import app from './app';
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`🚀 伺服器已成功啟動在 http://localhost:${PORT}`);
+  console.log(
+    `🚀 伺服器已成功啟動在 http://localhost:${PORT}，環境：${process.env.NODE_ENV}`
+  );
 });

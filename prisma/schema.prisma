@@ -20,5 +20,18 @@ model User {
   birthday  DateTime           // 日期時間格式
   phone     String
   createdAt DateTime @default(now())
+  articles  Article[]             // 代表這個 User 可以擁有多個 Posts
+}
+
+model Article {
+  id        Int      @id @default(autoincrement())
+  title     String   // 文章標題
+  content   String?  // 文章內容 (可選)
+  published Boolean  @default(false) // 是否發布
+  createdAt DateTime @default(now())
+  
+  // ▼ 建立關聯：這篇文章屬於哪位作者
+  authorId  Int      
+  author    User     @relation(fields: [authorId], references: [id])
 }
 

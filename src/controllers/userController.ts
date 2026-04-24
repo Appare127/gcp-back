@@ -9,9 +9,12 @@
 
 // 不該做什麼：不應該參與真正的「業務邏輯判斷」或「下 SQL 指令」。它的任務只是「HTTP 協定」與「業務邏輯」之間的橋樑。
 
-import type { Request, Response } from 'express';
+import type { Request, Response, NextFunction } from 'express';
 import { getHelloMessage } from '../services/helloService';
-import { createUserService } from '../services/userService';
+import { createUserService, loginUserService } from '../services/userService';
+
+import { AppError } from '../utils/appError';
+import { catchAsync } from '../utils/catchAsync';
 
 export async function sayHello(req: Request, res: Response): Promise<void> {
   try {
@@ -118,3 +121,66 @@ export async function registerUser(req: Request, res: Response): Promise<void> {
     res.status(500).json({ success: false, message: '伺服器內部錯誤' });
   }
 }
+
+export const loginUser = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { account, password } = req.body;
+
+    if (!account || !password) {
+      return next(new AppError('請輸入帳號與密碼', 400));
+    }
+
+    const serviceResult = await loginUserService({
+      account,
+      password
+    });
+    if (!serviceResult.success) {
+      return next(new AppError(serviceResult.message || '登入失敗', 401));
+    }
+    res.status(200).json({
+      success: true,
+      message: '登入成功!',
+      token: serviceResult.token,
+      user: serviceResult.user
+    });
+  }
+);
+
+// /**
+//  * 處理登入請求的控制器
+//  */
+// export async function loginUser(req: Request, res: Response): Promise<void> {
+//   try {
+//     const { account, password } = req.body;
+
+//     // 1. 基本檢查：是否有填寫帳號密碼
+//     if (!account || !password) {
+//       res.status(400).json({ success: false, message: '請輸入帳號與密碼' });
+//       return;
+//     }
+
+//     // 2. 呼叫 Service 執行登入邏輯
+//     const serviceResult = await loginUserService({ account, password });
+
+//     if (!serviceResult.success) {
+//       // 登入失敗 (帳號不存在或密碼錯誤)
+//       res.status(401).json({
+//         // 401 代表 Unauthorized (未授權)
+//         success: false,
+//         message: serviceResult.message
+//       });
+//       return;
+//     }
+
+//     // 3. 登入成功，回傳 Token
+//     res.status(200).json({
+//       success: true,
+//       message: '登入成功！',
+//       token: serviceResult.token, // 回傳剛剛核發的通行證
+//       user: serviceResult.user // 以及使用者基本資料
+//     });
+//   } catch (error) {
+//     console.error('登入發生錯誤：', error);
+//     res.status(500).json({ success: false, message: '伺服器內部錯誤' });
+//   }
+// }

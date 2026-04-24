@@ -11,6 +11,12 @@
     "module": "commonjs",
     "target": "esnext",
     "types": [],
+
+    // 讓 TypeScript 能夠相容 CommonJS 的模組（讓您可以直接用 import 導入那些原本只支援 require 的套件）。
+    "esModuleInterop": true,
+    // 許您在沒有明確 default export 的模組上使用預設導入（例如 express）。
+    "allowSyntheticDefaultImports": true,
+
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],
@@ -40,6 +46,10 @@
     "isolatedModules": true,
     "noUncheckedSideEffectImports": true,
     "moduleDetection": "force",
-    "skipLibCheck": true,
-  }
+    "skipLibCheck": true
+  },
+  // 只有 src 裡面的檔案才要編譯
+  "include": ["src/**/*"],
+  // 排除套件資料夾
+  "exclude": ["node_modules"]
 }
