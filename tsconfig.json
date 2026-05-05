@@ -19,6 +19,7 @@
     // 許您在沒有明確 default export 的模組上使用預設導入（例如 express）。
     "allowSyntheticDefaultImports": true,
 
+    "ignoreDeprecations": "6.0",
     // 指定基礎目錄為專案根目錄
     "baseUrl": ".",
     // 設定快速絕對路徑

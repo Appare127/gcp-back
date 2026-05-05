@@ -3,6 +3,7 @@ import { swaggerSpec } from './swagger';
 
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
 import routes from './routes';
 import { globalErrorHandler } from './middlewares/errorMiddleware';
 
@@ -11,6 +12,9 @@ const app = express();
 // 基本的中介軟體
 app.use(cors()); // 允許前端跨域連線
 app.use(express.json()); // 支援解析 JSON 格式的 Request Body
+
+// 當網址輸入 /uploads 時，去對應到專案目錄下的 public/uploads 資料夾
+app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
 
 // 掛載 API 路由，所有的路由都會加上 /api 前綴
 app.use('/api', routes);
