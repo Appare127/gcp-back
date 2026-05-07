@@ -2,18 +2,21 @@ import multer from 'multer';
 import path from 'path';
 import { AppError } from '@/utils/appError';
 
-// 1. 設定儲存位置與檔名規則
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'public/uploads'); // 檔案存放在這裡
-  },
-  filename: (req, file, cb) => {
-    // 重新命名：時間戳記-隨機數.副檔名
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    cb(null, `image-${uniqueSuffix}${ext}`);
-  }
-});
+// // 1. 設定儲存位置與檔名規則
+// const storage = multer.diskStorage({
+//   destination: (req, file, cb) => {
+//     cb(null, 'public/uploads'); // 檔案存放在這裡
+//   },
+//   filename: (req, file, cb) => {
+//     // 重新命名：時間戳記-隨機數.副檔名
+//     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+//     const ext = path.extname(file.originalname);
+//     cb(null, `image-${uniqueSuffix}${ext}`);
+//   }
+// });
+
+// 記憶體模式，檔案會存在緩衝區 (buffer) 中，不會佔用你的硬碟空間
+const storage = multer.memoryStorage();
 
 // 2. 設定過濾器：只允許圖片
 const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
