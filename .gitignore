@@ -1,4 +1,4 @@
 node_modules
-# .env
+.env
 /src/generated/prisma
 gcp-storage-image-key.json
