@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   registerUser,
   loginUser,
+  getUserInfo,
   sayHello
 } from '../controllers/userController';
 import { authenticateToken } from '../middlewares/authMiddleware';
@@ -37,6 +38,22 @@ router.post('/register', registerUser);
  *         description: 帳號或密碼錯誤
  */
 router.post('/login', loginUser);
+
+/**
+ * @openapi
+ * /users/info:
+ *   get:
+ *     summary: 取得當前登入用戶資料
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: 成功取得用戶資料
+ *       401:
+ *         description: 未授權或 Token 無效
+ */
+router.get('/info', authenticateToken, getUserInfo);
 
 router.get('/hello', sayHello);
 router.get('/me', authenticateToken, (req, res) => {

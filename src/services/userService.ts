@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../prisma'; // 連線資料庫的工具
 import bcrypt from 'bcryptjs'; // 我們剛剛裝的加密工具
 import { SignOptions } from 'jsonwebtoken';
+import { decryptWithRsa } from '../utils/crypto';
 
 // 負責執行「註冊」的核心商業邏輯
 export async function createUserService(data: any) {
@@ -56,9 +57,18 @@ export async function loginUserService(data: any) {
     // (資安小常識：報錯時不要明說「帳號不存在」，這樣駭客就無法猜測哪些帳號有註冊)
   }
 
-  // 【動作二】：比對密碼
-  // 使用 bcrypt.compare 比較「前端傳來的明文密碼」跟「資料庫存的雜湊加密密碼」
-  const isPasswordValid = await bcrypt.compare(data.password, user.password);
+  // 【動作二】：RSA 解密密碼
+  let rawPassword = data.password;
+  try {
+    rawPassword = decryptWithRsa(data.password);
+  } catch (error) {
+    // 若解密失敗（如傳入明文測試或格式不合），保留原字串交由後續 bcrypt 比對
+    rawPassword = data.password;
+  }
+
+  // 【動作三】：比對密碼
+  // 使用 bcrypt.compare 比較「解密後的明文密碼」跟「資料庫存的雜湊加密密碼」
+  const isPasswordValid = await bcrypt.compare(rawPassword, user.password);
   if (!isPasswordValid) {
     // 密碼比對失敗
     return { success: false, message: '帳號或密碼錯誤' };
@@ -80,12 +90,34 @@ export async function loginUserService(data: any) {
     { expiresIn: expiresIn as Required<SignOptions>['expiresIn'] } // 設定時效
   );
 
-  // 【動作四】：防呆，把密碼拔掉後再回傳
-  const { password, ...userWithoutPassword } = user;
+  // 【動作四】：防呆，把密碼與內部 id 拔掉後再回傳
+  const { password, id, birthday, ...userProfile } = user;
   return {
     success: true,
     message: '登入成功',
     token: token, // 把這張通行證回傳給前端！
-    user: userWithoutPassword
+    user: userProfile
+  };
+}
+
+/**
+ * 負責取得當前登入使用者個人資料的商業邏輯
+ * @param userId 使用者 ID
+ */
+export async function getUserInfoService(userId: number) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId }
+  });
+
+  if (!user) {
+    return { success: false, message: '找不到此用戶' };
+  }
+
+  // 防呆：去除密碼與內部 id 後回傳
+  const { password, id, birthday, ...userProfile } = user;
+
+  return {
+    success: true,
+    user: userProfile
   };
 }

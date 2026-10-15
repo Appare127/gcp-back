@@ -1,8 +1,8 @@
 export const userSchemas = {
-  User: {
+  UserModel: {
     type: 'object',
     properties: {
-      id: { type: 'integer' },
+      // id: { type: 'integer' },
       account: { type: 'string' },
       email: { type: 'string' },
       phone: { type: 'string' },
@@ -87,7 +87,7 @@ export const userSchemas = {
       message: { type: 'string', example: '登入成功!' },
       token: { type: 'string', description: 'JWT 通行證' },
       user: {
-        $ref: '#/components/schemas/User'
+        $ref: '#/components/schemas/UserModel'
       }
     }
   }
@@ -142,4 +142,3 @@ export const userRequestBodies = {
     }
   }
 };
-

@@ -11,7 +11,11 @@
 
 import type { Request, Response, NextFunction } from 'express';
 import { getHelloMessage } from '../services/helloService';
-import { createUserService, loginUserService } from '../services/userService';
+import {
+  createUserService,
+  loginUserService,
+  getUserInfoService
+} from '../services/userService';
 
 import { AppError } from '../utils/appError';
 import { catchAsync } from '../utils/catchAsync';
@@ -122,6 +126,13 @@ export async function registerUser(req: Request, res: Response): Promise<void> {
   }
 }
 
+/**
+ * 處理登入請求的控制器
+ * @param req 請求
+ * @param res 回應
+ * @param next 下一個 middleware
+ * @returns Promise<void>
+ */
 export const loginUser = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     const { account, password } = req.body;
@@ -142,6 +153,34 @@ export const loginUser = catchAsync(
       message: '登入成功!',
       token: serviceResult.token,
       user: serviceResult.user
+    });
+  }
+);
+
+/**
+ * 取得當前登入用戶資料
+ * @param req
+ * @param res
+ * @param next
+ */
+export const getUserInfo = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    // 從 authenticateToken 中介軟體解密後掛載在 req.user 的資料中取出 userId
+    const userId = (req as any).user?.userId;
+
+    if (!userId) {
+      return next(new AppError('未授權，找不到用戶資訊', 401));
+    }
+
+    const serviceResult = await getUserInfoService(userId);
+    if (!serviceResult.success) {
+      return next(new AppError(serviceResult.message || '找不到用戶', 404));
+    }
+
+    res.status(200).json({
+      success: true,
+      message: '取得用戶資料成功',
+      data: serviceResult.user
     });
   }
 );
