@@ -1,0 +1,302 @@
+[
+  {
+    "rank": 1,
+    "ip": "18.166.97.91",
+    "requests": 2732971,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "HK",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 2,
+    "ip": "52.74.41.161",
+    "requests": 785996,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "SG",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 3,
+    "ip": "106.127.206.123",
+    "requests": 749968,
+    "asn": "AS4134",
+    "org": "Chinanet",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 4,
+    "ip": "16.163.89.166",
+    "requests": 700798,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "HK",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 5,
+    "ip": "52.77.118.10",
+    "requests": 579950,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "SG",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 6,
+    "ip": "18.166.169.181",
+    "requests": 570804,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "HK",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 7,
+    "ip": "165.154.121.116",
+    "requests": 469247,
+    "asn": "AS135377",
+    "org": "UCLOUD INFORMATION TECHNOLOGY (HK) LIMITED",
+    "country": "TH",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 8,
+    "ip": "43.199.153.155",
+    "requests": 404939,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "HK",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 9,
+    "ip": "171.100.236.139",
+    "requests": 343957,
+    "asn": "AS17552",
+    "org": "True Online",
+    "country": "TH",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 10,
+    "ip": "13.250.214.122",
+    "requests": 317963,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "SG",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 11,
+    "ip": "203.132.58.11",
+    "requests": 219976,
+    "asn": "AS17816",
+    "org": "China Unicom IP network China169 Guangdong province",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 12,
+    "ip": "104.28.205.74",
+    "requests": 216177,
+    "asn": "AS13335",
+    "org": "Cloudflare, Inc.",
+    "country": "VN",
+    "category": "CDN／內容傳遞服務商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 13,
+    "ip": "13.214.13.116",
+    "requests": 186384,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "SG",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 14,
+    "ip": "104.28.205.73",
+    "requests": 174463,
+    "asn": "AS13335",
+    "org": "Cloudflare, Inc.",
+    "country": "VN",
+    "category": "CDN／內容傳遞服務商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 15,
+    "ip": "39.144.168.93",
+    "requests": 162417,
+    "asn": "AS56045",
+    "org": "China Mobile communications corporation",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 16,
+    "ip": "27.151.24.136",
+    "requests": 161726,
+    "asn": "AS133774",
+    "org": "Fuzhou",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 17,
+    "ip": "54.254.122.160",
+    "requests": 149249,
+    "asn": "AS16509",
+    "org": "Amazon.com, Inc.",
+    "country": "SG",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 18,
+    "ip": "133.106.48.121",
+    "requests": 149203,
+    "asn": "AS138384",
+    "org": "Rakuten Mobile Network, Inc.",
+    "country": "JP",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 19,
+    "ip": "112.209.191.84",
+    "requests": 149122,
+    "asn": "AS9299",
+    "org": "Philippine Long Distance Telephone Company",
+    "country": "PH",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 20,
+    "ip": "183.219.114.73",
+    "requests": 132489,
+    "asn": "AS56045",
+    "org": "China Mobile communications corporation",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 21,
+    "ip": "124.225.158.31",
+    "requests": 127915,
+    "asn": "AS4134",
+    "org": "Chinanet",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 22,
+    "ip": "27.210.115.52",
+    "requests": 127909,
+    "asn": "AS4837",
+    "org": "CHINA UNICOM China169 Backbone",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 23,
+    "ip": "27.150.188.202",
+    "requests": 127667,
+    "asn": "AS133774",
+    "org": "Fuzhou",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 24,
+    "ip": "49.72.110.70",
+    "requests": 127592,
+    "asn": "AS4134",
+    "org": "Chinanet",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 25,
+    "ip": "125.124.36.163",
+    "requests": 127416,
+    "asn": "AS58461",
+    "org": "CT-HangZhou-IDC",
+    "country": "CN",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 26,
+    "ip": "125.75.108.192",
+    "requests": 127268,
+    "asn": "AS141998",
+    "org": "China Telecom",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 27,
+    "ip": "118.31.79.39",
+    "requests": 127034,
+    "asn": "AS37963",
+    "org": "Hangzhou Alibaba Advertising Co.,Ltd.",
+    "country": "CN",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 28,
+    "ip": "120.230.121.34",
+    "requests": 126879,
+    "asn": "AS9808",
+    "org": "China Mobile Communications Group Co., Ltd.",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  },
+  {
+    "rank": 29,
+    "ip": "47.108.56.72",
+    "requests": 124258,
+    "asn": "AS37963",
+    "org": "Hangzhou Alibaba Advertising Co.,Ltd.",
+    "country": "CN",
+    "category": "主機供應商",
+    "isHighRisk": true
+  },
+  {
+    "rank": 30,
+    "ip": "106.58.220.115",
+    "requests": 124008,
+    "asn": "AS4134",
+    "org": "Chinanet",
+    "country": "CN",
+    "category": "電信業者",
+    "isHighRisk": false
+  }
+]

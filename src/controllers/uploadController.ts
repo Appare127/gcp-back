@@ -8,6 +8,27 @@ import {
   createDriveFolder,
   deleteDriveFile
 } from '@/drive';
+import { analyzeIpCsvStream } from '@/services/ipAnalysisService';
+
+/**
+ * 上傳並即時分析 IP CSV 檔案控制器
+ */
+export const uploadAndAnalyzeCsv = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.file) {
+      return next(new AppError('請選擇要上傳的 CSV 檔案', 400));
+    }
+
+    // 調用分析服務解析 Buffer 內容
+    const analysisResult = await analyzeIpCsvStream(req.file.buffer);
+
+    res.status(200).json({
+      success: true,
+      message: 'CSV 分析完成！',
+      data: analysisResult
+    });
+  }
+);
 
 export const uploadSingleImage = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {

@@ -14,7 +14,8 @@ datasource db {
 
 model User {
   id        Int      @id @default(autoincrement())
-  account   String   @unique   // 帳號必須是唯一的，不能重複
+  /// 帳號必須是唯一的，不能重複
+  account   String   @unique   
   password  String             // 這裡會存加密過後的亂碼，所以不用限制長度
   email     String
   birthday  DateTime           // 日期時間格式

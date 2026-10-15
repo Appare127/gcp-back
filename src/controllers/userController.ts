@@ -110,8 +110,8 @@ export async function registerUser(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 全部通關，回傳 200 成功，並附上剛建立的使用者資料（不含密碼）
-    res.status(200).json({
+    // 全部通關，回傳 201 成功，並附上剛建立的使用者資料（不含密碼）
+    res.status(201).json({
       success: true,
       message: '註冊大成功！',
       data: serviceResult.user

@@ -1,8 +1,8 @@
 {
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    "module": "node16",
-    "moduleResolution": "node16",
+    "module": "CommonJS",
+    "moduleResolution": "node",
 
     // File Layout
     "rootDir": "./src",

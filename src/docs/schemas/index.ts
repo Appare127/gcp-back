@@ -1,4 +1,8 @@
-import { userSchemas } from './user.schema';
+import {
+  userSchemas as userSchemas,
+  userResponses as userResponses,
+  userRequestBodies as userRequestBodies
+} from './user.schema';
 import {
   schemas as articleSchemas,
   responses as articleResponses,
@@ -11,9 +15,11 @@ export const allSchemas = {
 };
 
 export const allResponses = {
-  ...articleResponses
+  ...articleResponses,
+  ...userResponses
 };
 
 export const allRequestBodies = {
-  ...articleRequestBodies
+  ...articleRequestBodies,
+  ...userRequestBodies
 };

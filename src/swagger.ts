@@ -5,13 +5,13 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'GCP 後端專案 API 文件',
+      title: '後端專案 API 文件',
       version: '1.0.0',
       description: '這是使用 Express + Prisma + TypeScript 打造的標準後端架構'
     },
     servers: [
       {
-        url: 'http://localhost:3000/api',
+        url: 'http://localhost:3001/api',
         description: '本地開發伺服器'
       }
     ],

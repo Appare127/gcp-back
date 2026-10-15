@@ -15,26 +15,29 @@ const router = Router();
  *     summary: 註冊新用戶
  *     tags: [Users]
  *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [account, password, email, birthday, phone]
- *             properties:
- *               account: { type: string, example: "test123" }
- *               password: { type: string, example: "Password123" }
- *               email: { type: string, example: "test@gmail.com" }
- *               birthday: { type: string, example: "1995-01-01" }
- *               phone: { type: string, example: "0912345678" }
+ *       $ref: '#/components/requestBodies/RegisterUserInput'
  *     responses:
- *       200:
- *         description: 註冊成功
- *       400:
- *         description: 格式錯誤或帳號已存在
+ *       201:
+ *         $ref: '#/components/responses/CreatedUser'
  */
 router.post('/register', registerUser);
+
+/**
+ * @openapi
+ * /users/login:
+ *   post:
+ *     summary: 登入
+ *     tags: [Users]
+ *     requestBody:
+ *       $ref: '#/components/requestBodies/LoginUserInput'
+ *     responses:
+ *       200:
+ *         $ref: '#/components/responses/LoginSuccess'
+ *       401:
+ *         description: 帳號或密碼錯誤
+ */
 router.post('/login', loginUser);
+
 router.get('/hello', sayHello);
 router.get('/me', authenticateToken, (req, res) => {
   /* ...原本 /me 的邏輯 ... */

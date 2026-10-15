@@ -10,17 +10,24 @@ export const schemas = {
   },
   CreateArticleInput: {
     type: 'object',
-    required: ['title'],
+    required: ['title', 'content'],
     properties: {
       title: {
         type: 'string',
         description: '這是文章的標題，長度建議在 5 到 50 字之間',
         minLength: 5,
         maxLength: 50
+      },
+      content: {
+        type: 'string',
+        description: '這是文章的內容，長度建議在 10 到 1000 字之間',
+        minLength: 10,
+        maxLength: 1000
       }
     },
     example: {
-      title: '這是範例標題'
+      title: '這是範例標題',
+      content: '這是文章內容。'
     }
   }
 };

@@ -27,11 +27,43 @@ const fileFilter = (req: any, file: Express.Multer.File, cb: any) => {
   }
 };
 
-// 3. 初始化 Multer
-export const upload = multer({
+// 3. 初始化 Multer (圖片專用)
+export const uploadImage = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
     fileSize: 2 * 1024 * 1024 // 限制 2MB
+  }
+});
+
+/**
+ * 檢查是否為 CSV 檔案格式的過濾器
+ */
+function csvFileFilter(
+  req: any,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+): void {
+  const ext = path.extname(file.originalname).toLowerCase();
+  const isCsvMime =
+    file.mimetype === 'text/csv' ||
+    file.mimetype === 'text/plain' ||
+    file.mimetype === 'application/vnd.ms-excel';
+
+  if (ext === '.csv' || isCsvMime) {
+    cb(null, true);
+  } else {
+    cb(new AppError('請上傳 CSV 格式檔案！', 400));
+  }
+}
+
+/**
+ * CSV 檔案上傳中介軟體（限制 50MB，記憶體緩衝區模式）
+ */
+export const uploadCsv = multer({
+  storage: storage,
+  fileFilter: csvFileFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 限制 50MB
   }
 });
