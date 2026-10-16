@@ -8,18 +8,27 @@ import {
   responses as articleResponses,
   requestBodies as articleRequestBodies
 } from './article.schema';
+import {
+  analysisSchemas,
+  blacklistSchemas,
+  analysisResponses
+} from './analysis.schema';
 
 export const allSchemas = {
   ...userSchemas,
-  ...articleSchemas
+  ...articleSchemas,
+  ...analysisSchemas,
+  ...blacklistSchemas
 };
 
 export const allResponses = {
   ...articleResponses,
-  ...userResponses
+  ...userResponses,
+  ...analysisResponses
 };
 
 export const allRequestBodies = {
   ...articleRequestBodies,
   ...userRequestBodies
 };
+

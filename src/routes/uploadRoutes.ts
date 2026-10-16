@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import {
   uploadSingleImage,
-  uploadAndAnalyzeCsv,
+  uploadAndAnalyzeGeoLiteCsv,
+  checkIpFirehol,
+  uploadAndAnalyzeFireholCsv,
   getDriveFiles,
   createFolder,
   deleteFile
@@ -15,10 +17,10 @@ router.post('/single', uploadImage.single('image'), uploadSingleImage);
 
 /**
  * @openapi
- * /upload/csv:
+ * /upload/geolite/csv:
  *   post:
- *     summary: 上傳並即時分析 IP CSV 檔案
- *     tags: [Upload]
+ *     summary: 上傳並即時分析 IP CSV 檔案 (GeoLite2 分析)
+ *     tags: [GeoLite2]
  *     requestBody:
  *       required: true
  *       content:
@@ -33,11 +35,58 @@ router.post('/single', uploadImage.single('image'), uploadSingleImage);
  *                 description: 請選擇要上傳並分析的 .csv 檔案
  *     responses:
  *       200:
- *         description: 分析完成，回傳產業類別分佈與 Top 30 IP 統計報表
+ *         $ref: '#/components/responses/GeoLiteAnalysisSuccess'
  *       400:
  *         description: 未選擇檔案或檔案格式錯誤
  */
-router.post('/csv', uploadCsv.single('file'), uploadAndAnalyzeCsv);
+router.post('/geolite/csv', uploadCsv.single('file'), uploadAndAnalyzeGeoLiteCsv);
+
+/**
+ * @openapi
+ * /upload/firehol/check:
+ *   get:
+ *     summary: 查詢單一 IP 是否在線上 FireHOL Level 1 惡意黑名單中
+ *     tags: [FireHOL]
+ *     parameters:
+ *       - in: query
+ *         name: ip
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 欲查詢的 IPv4 位址 (例如 1.10.16.5)
+ *     responses:
+ *       200:
+ *         description: 查詢成功，回傳是否命中黑名單與詳細狀態
+ *       400:
+ *         description: 未提供 IP 參數或格式錯誤
+ */
+router.get('/firehol/check', checkIpFirehol);
+
+/**
+ * @openapi
+ * /upload/firehol/csv:
+ *   post:
+ *     summary: 上傳 IP CSV 檔案並進行線上 FireHOL Level 1 批次黑名單分析
+ *     tags: [FireHOL]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [file]
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: 請選擇要上傳並比對 FireHOL 的 .csv 檔案
+ *     responses:
+ *       200:
+ *         $ref: '#/components/responses/FireholAnalysisSuccess'
+ *       400:
+ *         description: 未選擇檔案或檔案格式錯誤
+ */
+router.post('/firehol/csv', uploadCsv.single('file'), uploadAndAnalyzeFireholCsv);
 
 router.get('/files', getDriveFiles);
 
@@ -45,3 +94,4 @@ router.post('/folder', createFolder);
 router.delete('/files/:id', deleteFile);
 
 export default router;
+

@@ -201,6 +201,42 @@ function classifyProvider(
 }
 
 /**
+ * 判斷是否為 CSV 的標題列 (例如 client_ip,doc_count 或 ip,count)
+ */
+function isCsvHeader(ipStr: string, rawDocCount?: string): boolean {
+  const lowerIp = ipStr.toLowerCase();
+  const knownIpHeaders = [
+    'client_ip',
+    'ip',
+    'ip_address',
+    'ipaddress',
+    'clientip',
+    'remote_addr',
+    'source_ip',
+    'src_ip',
+    'address'
+  ];
+  if (knownIpHeaders.includes(lowerIp)) {
+    return true;
+  }
+  if (rawDocCount) {
+    const lowerCount = rawDocCount.toLowerCase();
+    const knownCountHeaders = [
+      'doc_count',
+      'count',
+      'requests',
+      'request_count',
+      'total',
+      'hits'
+    ];
+    if (knownCountHeaders.includes(lowerCount)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * 解析上傳的 IP CSV 緩衝區並進行 MaxMind GeoIP / ASN 分析
  */
 export async function analyzeIpCsvStream(
@@ -226,6 +262,11 @@ export async function analyzeIpCsvStream(
     const ip = parts[0] ? parts[0].trim() : '';
     const rawDocCount = parts[1] ? parts[1].trim() : '';
     const docCount = rawDocCount ? parseInt(rawDocCount, 10) || 1 : 1;
+
+    // 排除標題列 (例如 client_ip,doc_count)
+    if (isCsvHeader(ip, rawDocCount)) {
+      continue;
+    }
 
     // 驗證是否為合法 IPv4 / IPv6
     if (!maxmind.validate(ip)) {
@@ -304,7 +345,17 @@ export async function analyzeIpCsvStream(
     cat.totalRequests += item.totalRequests;
   }
 
-  const categoryTable = Array.from(categorySummaryMap.values());
+  const categoryTable = Array.from(categorySummaryMap.values()).sort(
+    (a, b) => {
+      // 將「其他（無 ASN／資料不足）」排在最下方
+      if (a.category === '其他（無 ASN／資料不足）') return 1;
+      if (b.category === '其他（無 ASN／資料不足）') return -1;
+      if (a.category === '其他（資料不足）') return 1;
+      if (b.category === '其他（資料不足）') return -1;
+      // 其餘項目維持總請求數由大到小排序
+      return b.totalRequests - a.totalRequests;
+    }
+  );
   const highRiskCategories = categoryTable.filter((c) => c.isHighRisk);
   const highRiskIpsInTop30 = top30Ips.filter((item) => item.isHighRisk);
 

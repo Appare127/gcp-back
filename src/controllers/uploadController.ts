@@ -9,11 +9,15 @@ import {
   deleteDriveFile
 } from '@/drive';
 import { analyzeIpCsvStream } from '@/services/ipAnalysisService';
+import {
+  checkSingleIpFirehol,
+  analyzeCsvWithFirehol
+} from '@/services/fireholService';
 
 /**
- * 上傳並即時分析 IP CSV 檔案控制器
+ * 上傳並即時分析 IP CSV 檔案控制器 (GeoLite2 方法)
  */
-export const uploadAndAnalyzeCsv = catchAsync(
+export const uploadAndAnalyzeGeoLiteCsv = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     if (!req.file) {
       return next(new AppError('請選擇要上傳的 CSV 檔案', 400));
@@ -24,8 +28,46 @@ export const uploadAndAnalyzeCsv = catchAsync(
 
     res.status(200).json({
       success: true,
-      message: 'CSV 分析完成！',
+      message: 'GeoLite2 CSV 分析完成！',
       data: analysisResult
+    });
+  }
+);
+
+/**
+ * 查詢單一 IP 是否在線上 FireHOL Level 1 黑名單中
+ */
+export const checkIpFirehol = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const ip = req.query.ip as string;
+    if (!ip) {
+      return next(new AppError('請提供欲查詢的 IP 參數 (?ip=...)', 400));
+    }
+
+    const result = await checkSingleIpFirehol(ip);
+
+    res.status(200).json({
+      success: true,
+      data: result
+    });
+  }
+);
+
+/**
+ * 上傳 CSV 檔案進行線上 FireHOL Level 1 黑名單比對
+ */
+export const uploadAndAnalyzeFireholCsv = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (!req.file) {
+      return next(new AppError('請選擇要上傳的 CSV 檔案', 400));
+    }
+
+    const result = await analyzeCsvWithFirehol(req.file.buffer);
+
+    res.status(200).json({
+      success: true,
+      message: 'FireHOL 黑名單比對完成！',
+      data: result
     });
   }
 );

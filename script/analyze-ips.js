@@ -256,7 +256,17 @@ async function run() {
     cat.totalRequests += item.totalRequests;
   }
 
-  const categoryTable = Array.from(categorySummaryMap.values());
+  const categoryTable = Array.from(categorySummaryMap.values()).sort(
+    (a, b) => {
+      // 將「其他（無 ASN／資料不足）」排在最下方
+      if (a.category === '其他（無 ASN／資料不足）') return 1;
+      if (b.category === '其他（無 ASN／資料不足）') return -1;
+      if (a.category === '其他（資料不足）') return 1;
+      if (b.category === '其他（資料不足）') return -1;
+      // 其餘項目維持總請求數由大到小排序
+      return b.totalRequests - a.totalRequests;
+    }
+  );
   const highRiskCategories = categoryTable.filter((c) => c.isHighRisk);
   const totalHighRiskIsps = highRiskCategories.reduce(
     (sum, c) => sum + c.ispCount,
