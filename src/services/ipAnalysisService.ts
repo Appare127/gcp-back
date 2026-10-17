@@ -1,5 +1,11 @@
 import path from 'path';
 import maxmind, { Reader, AsnResponse, CityResponse } from 'maxmind';
+import { AppError } from '../utils/appError';
+import {
+  analyzeIpWithAiAgent,
+  IpSecurityAssessment
+} from './aiAgentService';
+import { checkSingleIpFirehol } from './fireholService';
 
 /**
  * 業者分類與風險標籤
@@ -7,6 +13,39 @@ import maxmind, { Reader, AsnResponse, CityResponse } from 'maxmind';
 export interface ProviderClassification {
   category: string;
   isHighRisk: boolean;
+}
+
+/**
+ * 單一 IP 的 GeoLite2 查詢結果介面
+ */
+export interface GeoLiteIpCheckResult {
+  ip: string;
+  isValid: boolean;
+  ipType: 'IPv4' | 'IPv6';
+  asn: {
+    asn: string;
+    autonomousSystemNumber: number | null;
+    org: string;
+  };
+  geo: {
+    continent: string;
+    country: string;
+    countryName: string;
+    city: string;
+    subdivision: string;
+    timeZone: string;
+    latitude: number | null;
+    longitude: number | null;
+  };
+  classification: ProviderClassification;
+  aiAssessment: IpSecurityAssessment;
+  blacklist: {
+    isListed: boolean;
+    threatLevel: string;
+    source: string;
+  };
+  categorySummary: CategorySummaryItem[];
+  top30Ips: TopIpItem[];
 }
 
 /**
@@ -370,5 +409,117 @@ export async function analyzeIpCsvStream(
     },
     categorySummary: categoryTable,
     top30Ips
+  };
+}
+
+/**
+ * 查詢單一 IP 的 GeoLite2 (ISP / ASN 與地理位置) 資訊
+ */
+export async function checkSingleIpGeoLite(
+  ipInput: string
+): Promise<GeoLiteIpCheckResult> {
+  const ip = ipInput.trim();
+  if (!maxmind.validate(ip)) {
+    throw new AppError('輸入的 IP 格式無效 (支援 IPv4 或 IPv6)', 400);
+  }
+
+  const { asnReader, cityReader } = await getLookupReaders();
+  const asnData = asnReader.get(ip);
+  const cityData = cityReader.get(ip);
+
+  const ipType: 'IPv4' | 'IPv6' = ip.includes(':') ? 'IPv6' : 'IPv4';
+
+  const asnNumber = asnData?.autonomous_system_number
+    ? `AS${asnData.autonomous_system_number}`
+    : 'Unknown';
+  const asnOrg = asnData?.autonomous_system_organization || 'Unknown Org';
+
+  const classification = classifyProvider(asnNumber, asnOrg);
+
+  const continent =
+    cityData?.continent?.names?.['zh-CN'] ||
+    cityData?.continent?.names?.en ||
+    'Unknown';
+  const country =
+    cityData?.country?.iso_code ||
+    cityData?.registered_country?.iso_code ||
+    'Unknown';
+  const countryName =
+    cityData?.country?.names?.['zh-CN'] ||
+    cityData?.country?.names?.en ||
+    cityData?.registered_country?.names?.['zh-CN'] ||
+    cityData?.registered_country?.names?.en ||
+    'Unknown';
+  const city =
+    cityData?.city?.names?.['zh-CN'] || cityData?.city?.names?.en || 'Unknown';
+  const subdivision =
+    cityData?.subdivisions?.[0]?.names?.['zh-CN'] ||
+    cityData?.subdivisions?.[0]?.names?.en ||
+    'Unknown';
+  const timeZone = cityData?.location?.time_zone || 'Unknown';
+  const latitude = cityData?.location?.latitude ?? null;
+  const longitude = cityData?.location?.longitude ?? null;
+
+  // 1. 同時進行黑名單檢測
+  const blacklistCheck = await checkSingleIpFirehol(ip);
+
+  // 2. 呼叫 Gemini AI Agent 進行專業風險與代理屬性判定
+  const aiAssessment = await analyzeIpWithAiAgent({
+    ip,
+    country: `${countryName} (${country})`,
+    asn: asnNumber,
+    org: asnOrg,
+    category: classification.category,
+    isListed: blacklistCheck.isListed,
+    blacklistSource: blacklistCheck.source
+  });
+
+  const topIpItem: TopIpItem = {
+    rank: 1,
+    ip,
+    requests: 1,
+    asn: asnNumber,
+    org: asnOrg,
+    country,
+    category: aiAssessment.connectionType || classification.category,
+    isHighRisk: classification.isHighRisk || blacklistCheck.isListed || aiAssessment.riskLevel === '高風險'
+  };
+
+  const categorySummaryItem: CategorySummaryItem = {
+    category: aiAssessment.connectionType || classification.category,
+    isHighRisk: topIpItem.isHighRisk,
+    ispCount: asnNumber !== 'Unknown' ? 1 : 0,
+    ipCount: 1,
+    totalRequests: 1
+  };
+
+  return {
+    ip,
+    isValid: true,
+    ipType,
+    asn: {
+      asn: asnNumber,
+      autonomousSystemNumber: asnData?.autonomous_system_number ?? null,
+      org: asnOrg
+    },
+    geo: {
+      continent,
+      country,
+      countryName,
+      city,
+      subdivision,
+      timeZone,
+      latitude,
+      longitude
+    },
+    classification,
+    aiAssessment,
+    blacklist: {
+      isListed: blacklistCheck.isListed,
+      threatLevel: blacklistCheck.threatLevel,
+      source: blacklistCheck.source
+    },
+    categorySummary: [categorySummaryItem],
+    top30Ips: [topIpItem]
   };
 }

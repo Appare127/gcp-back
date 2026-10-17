@@ -8,7 +8,10 @@ import {
   createDriveFolder,
   deleteDriveFile
 } from '@/drive';
-import { analyzeIpCsvStream } from '@/services/ipAnalysisService';
+import {
+  analyzeIpCsvStream,
+  checkSingleIpGeoLite
+} from '@/services/ipAnalysisService';
 import {
   checkSingleIpFirehol,
   analyzeCsvWithFirehol
@@ -30,6 +33,26 @@ export const uploadAndAnalyzeGeoLiteCsv = catchAsync(
       success: true,
       message: 'GeoLite2 CSV 分析完成！',
       data: analysisResult
+    });
+  }
+);
+
+/**
+ * 查詢單一 IP 的 GeoLite2 (ISP / ASN 與地理位置) 資訊
+ */
+export const checkIpGeoLite = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const ip = (req.query.ip as string)?.trim();
+    if (!ip) {
+      return next(new AppError('請提供欲查詢的 IP 參數 (?ip=...)', 400));
+    }
+
+    const result = await checkSingleIpGeoLite(ip);
+
+    res.status(200).json({
+      success: true,
+      message: 'GeoLite2 單一 IP 查詢成功！',
+      data: result
     });
   }
 );

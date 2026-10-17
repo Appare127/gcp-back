@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   uploadSingleImage,
   uploadAndAnalyzeGeoLiteCsv,
+  checkIpGeoLite,
   checkIpFirehol,
   uploadAndAnalyzeFireholCsv,
   getDriveFiles,
@@ -14,6 +15,27 @@ const router = Router();
 
 // 'image' 必須跟前端傳來的欄位名稱 (Key) 一致
 router.post('/single', uploadImage.single('image'), uploadSingleImage);
+
+/**
+ * @openapi
+ * /upload/geolite/check:
+ *   get:
+ *     summary: 查詢單一 IP 的 GeoLite2 (ISP / ASN 與地理位置) 資訊
+ *     tags: [GeoLite2]
+ *     parameters:
+ *       - in: query
+ *         name: ip
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 欲查詢的 IPv4 或 IPv6 位址 (例如 1.1.1.1 或 2606:4700:4700::1111)
+ *     responses:
+ *       200:
+ *         $ref: '#/components/responses/GeoLiteSingleIpCheckSuccess'
+ *       400:
+ *         description: 未提供 IP 參數或格式錯誤
+ */
+router.get('/geolite/check', checkIpGeoLite);
 
 /**
  * @openapi

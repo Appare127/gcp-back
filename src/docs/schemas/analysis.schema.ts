@@ -173,6 +173,132 @@ export const analysisSchemas = {
         $ref: '#/components/schemas/ispResultModel'
       }
     }
+  },
+
+  /**
+   * 單一 IP GeoLite2 查詢資料核心模型
+   */
+  GeoLiteSingleIpCheckModel: {
+    type: 'object',
+    description: 'GeoLite2 單一 IP 查詢核心資料模型',
+    properties: {
+      ip: {
+        type: 'string',
+        description: '查詢的 IP 位址',
+        example: '1.1.1.1'
+      },
+      isValid: {
+        type: 'boolean',
+        description: 'IP 格式是否合法有效',
+        example: true
+      },
+      ipType: {
+        type: 'string',
+        description: 'IP 協定版本 (IPv4 或 IPv6)',
+        example: 'IPv4'
+      },
+      asn: {
+        type: 'object',
+        description: '自治系統 (ASN) 相關資訊',
+        properties: {
+          asn: { type: 'string', example: 'AS13335' },
+          autonomousSystemNumber: { type: 'integer', example: 13335 },
+          org: { type: 'string', example: 'Cloudflare, Inc.' }
+        }
+      },
+      geo: {
+        type: 'object',
+        description: '地理位置相關資訊',
+        properties: {
+          continent: { type: 'string', example: '大洋洲' },
+          country: { type: 'string', example: 'AU' },
+          countryName: { type: 'string', example: '澳大利亞' },
+          city: { type: 'string', example: 'Unknown' },
+          subdivision: { type: 'string', example: 'Unknown' },
+          timeZone: { type: 'string', example: 'Australia/Sydney' },
+          latitude: { type: 'number', example: -33.8688 },
+          longitude: { type: 'number', example: 151.2093 }
+        }
+      },
+      classification: {
+        type: 'object',
+        description: '產業角色與風險標籤',
+        properties: {
+          category: { type: 'string', example: 'CDN／內容傳遞服務商' },
+          isHighRisk: { type: 'boolean', example: true }
+        }
+      },
+      aiAssessment: {
+        type: 'object',
+        description: 'Gemini AI Agent 產出之資安與代理屬性深度評估',
+        properties: {
+          connectionType: {
+            type: 'string',
+            description: '連線類型判定 (例如 ISP (家用/寬頻) 或 Hosting / Datacenter)',
+            example: 'ISP (家用/寬頻)'
+          },
+          riskAssessment: {
+            type: 'string',
+            description: '風險與代理屬性深度評估摘要',
+            example: '此 IP 屬住宅寬頻環境，常被住宅代理池利用或遭殭屍網路控制'
+          },
+          riskLevel: {
+            type: 'string',
+            description: '風險等級判定 (高風險、中風險、低至中、低風險)',
+            example: '低至中'
+          },
+          source: {
+            type: 'string',
+            description: '評估來源 (ai_agent 或 rule_fallback)',
+            example: 'ai_agent'
+          }
+        }
+      },
+      blacklist: {
+        type: 'object',
+        description: '線上威脅黑名單比對結果',
+        properties: {
+          isListed: { type: 'boolean', example: false },
+          threatLevel: { type: 'string', example: 'Clean / Not Listed' },
+          source: { type: 'string', example: 'FireHOL Level 1' }
+        }
+      },
+      categorySummary: {
+        type: 'array',
+        description: '單一 IP 之產業分類統計 (相容批次表格)',
+        items: {
+          $ref: '#/components/schemas/IspCategorySummaryItem'
+        }
+      },
+      top30Ips: {
+        type: 'array',
+        description: '單一 IP 之 Top 項目 (相容批次表格)',
+        items: {
+          $ref: '#/components/schemas/IspTopIpItem'
+        }
+      }
+    }
+  },
+
+  /**
+   * /upload/geolite/check 成功回應包裝模型
+   */
+  GeoLiteSingleIpCheckResponse: {
+    type: 'object',
+    description: 'GeoLite2 單一 IP 查詢成功回應結構',
+    properties: {
+      success: {
+        type: 'boolean',
+        example: true
+      },
+      message: {
+        type: 'string',
+        example: 'GeoLite2 單一 IP 查詢成功！'
+      },
+      data: {
+        $ref: '#/components/schemas/GeoLiteSingleIpCheckModel'
+      }
+    }
   }
 };
 
@@ -183,6 +309,17 @@ export const analysisResponses = {
       'application/json': {
         schema: {
           $ref: '#/components/schemas/GeoLiteAnalysisResponse'
+        }
+      }
+    }
+  },
+
+  GeoLiteSingleIpCheckSuccess: {
+    description: 'GeoLite2 單一 IP 查詢成功回應',
+    content: {
+      'application/json': {
+        schema: {
+          $ref: '#/components/schemas/GeoLiteSingleIpCheckResponse'
         }
       }
     }
