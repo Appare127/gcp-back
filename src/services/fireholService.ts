@@ -2,10 +2,19 @@ import fs from 'fs';
 import path from 'path';
 
 /**
- * FireHOL Level 1 (IPv4) 線上黑名單來源網址
+ * FireHOL Level 1 (IPv4) 線上黑名單來源網址 (無誤判、嚴重威脅黑名單)
  */
-const FIREHOL_URL =
+const FIREHOL_LEVEL1_URL =
   'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level1.netset';
+
+/**
+ * FireHOL Level 2 (IPv4) 線上黑名單來源網址 (過去 48 小時活躍攻擊來源)
+ */
+const FIREHOL_LEVEL2_URL =
+  'https://raw.githubusercontent.com/firehol/blocklist-ipsets/master/firehol_level2.netset';
+
+// 相容舊常數名稱
+const FIREHOL_URL = FIREHOL_LEVEL1_URL;
 
 /**
  * Spamhaus DROPv6 (IPv6) 線上黑名單來源網址
@@ -15,10 +24,16 @@ const SPAMHAUS_DROPV6_URL = 'https://www.spamhaus.org/drop/dropv6.txt';
 /**
  * 本機快取備份路徑 (避免斷網或外部服務異常時無法運作)
  */
-const FIREHOL_BACKUP_PATH = path.join(
+const FIREHOL_LEVEL1_BACKUP_PATH = path.join(
   process.cwd(),
   'data/firehol_level1.netset'
 );
+const FIREHOL_LEVEL2_BACKUP_PATH = path.join(
+  process.cwd(),
+  'data/firehol_level2.netset'
+);
+const FIREHOL_BACKUP_PATH = FIREHOL_LEVEL1_BACKUP_PATH;
+
 const SPAMHAUS_BACKUP_PATH = path.join(
   process.cwd(),
   'data/spamhaus_dropv6.txt'
@@ -67,6 +82,9 @@ export interface FireholCsvAnalysisResult {
     durationMs: number;
     source: string;
     lastUpdated: string;
+    level1Count?: number;
+    level2Count?: number;
+    spamhausCount?: number;
   };
   listedIps: FireholListedIpItem[];
 }
@@ -89,8 +107,11 @@ interface SpamhausCache {
   source: 'online' | 'local_backup';
 }
 
-let cachedFirehol: FireholCache | null = null;
-let lastFireholFetchTimeMs = 0;
+let cachedFireholLevel1: FireholCache | null = null;
+let lastFireholLevel1FetchTimeMs = 0;
+
+let cachedFireholLevel2: FireholCache | null = null;
+let lastFireholLevel2FetchTimeMs = 0;
 
 let cachedSpamhaus: SpamhausCache | null = null;
 let lastSpamhausFetchTimeMs = 0;
@@ -369,17 +390,17 @@ function parseAndMergeSpamhausDropv6(text: string): [bigint, bigint][] {
 }
 
 /**
- * 取得或更新 FireHOL (IPv4) 網段資料
+ * 取得或更新 FireHOL Level 1 (IPv4) 網段資料
  */
-async function getOrUpdateFireholRanges(): Promise<FireholCache> {
+export async function getOrUpdateFireholLevel1Ranges(): Promise<FireholCache> {
   const now = Date.now();
 
-  if (cachedFirehol && now - lastFireholFetchTimeMs < CACHE_TTL_MS) {
-    return cachedFirehol;
+  if (cachedFireholLevel1 && now - lastFireholLevel1FetchTimeMs < CACHE_TTL_MS) {
+    return cachedFireholLevel1;
   }
 
   try {
-    const response = await fetch(FIREHOL_URL, {
+    const response = await fetch(FIREHOL_LEVEL1_URL, {
       signal: AbortSignal.timeout(8000)
     });
 
@@ -387,46 +408,113 @@ async function getOrUpdateFireholRanges(): Promise<FireholCache> {
       const text = await response.text();
       const ranges = parseAndMergeNetsetText(text);
 
-      cachedFirehol = {
+      cachedFireholLevel1 = {
         ranges,
         lastUpdated: new Date(),
         source: 'online'
       };
-      lastFireholFetchTimeMs = now;
+      lastFireholLevel1FetchTimeMs = now;
 
-      fs.promises.writeFile(FIREHOL_BACKUP_PATH, text, 'utf-8').catch(() => {});
-      return cachedFirehol;
+      fs.promises
+        .writeFile(FIREHOL_LEVEL1_BACKUP_PATH, text, 'utf-8')
+        .catch(() => {});
+      return cachedFireholLevel1;
     }
   } catch {
     // 線上失敗時使用備用
   }
 
-  if (cachedFirehol) {
-    return cachedFirehol;
+  if (cachedFireholLevel1) {
+    return cachedFireholLevel1;
   }
 
-  if (fs.existsSync(FIREHOL_BACKUP_PATH)) {
+  if (fs.existsSync(FIREHOL_LEVEL1_BACKUP_PATH)) {
     try {
-      const text = await fs.promises.readFile(FIREHOL_BACKUP_PATH, 'utf-8');
+      const text = await fs.promises.readFile(FIREHOL_LEVEL1_BACKUP_PATH, 'utf-8');
       const ranges = parseAndMergeNetsetText(text);
 
-      cachedFirehol = {
+      cachedFireholLevel1 = {
         ranges,
         lastUpdated: new Date(),
         source: 'local_backup'
       };
-      lastFireholFetchTimeMs = now;
-      return cachedFirehol;
+      lastFireholLevel1FetchTimeMs = now;
+      return cachedFireholLevel1;
     } catch {}
   }
 
-  cachedFirehol = {
+  cachedFireholLevel1 = {
     ranges: [],
     lastUpdated: new Date(),
     source: 'local_backup'
   };
-  return cachedFirehol;
+  return cachedFireholLevel1;
 }
+
+/**
+ * 取得或更新 FireHOL Level 2 (IPv4) 網段資料
+ */
+export async function getOrUpdateFireholLevel2Ranges(): Promise<FireholCache> {
+  const now = Date.now();
+
+  if (cachedFireholLevel2 && now - lastFireholLevel2FetchTimeMs < CACHE_TTL_MS) {
+    return cachedFireholLevel2;
+  }
+
+  try {
+    const response = await fetch(FIREHOL_LEVEL2_URL, {
+      signal: AbortSignal.timeout(8000)
+    });
+
+    if (response.ok) {
+      const text = await response.text();
+      const ranges = parseAndMergeNetsetText(text);
+
+      cachedFireholLevel2 = {
+        ranges,
+        lastUpdated: new Date(),
+        source: 'online'
+      };
+      lastFireholLevel2FetchTimeMs = now;
+
+      fs.promises
+        .writeFile(FIREHOL_LEVEL2_BACKUP_PATH, text, 'utf-8')
+        .catch(() => {});
+      return cachedFireholLevel2;
+    }
+  } catch {
+    // 線上失敗時使用備用
+  }
+
+  if (cachedFireholLevel2) {
+    return cachedFireholLevel2;
+  }
+
+  if (fs.existsSync(FIREHOL_LEVEL2_BACKUP_PATH)) {
+    try {
+      const text = await fs.promises.readFile(FIREHOL_LEVEL2_BACKUP_PATH, 'utf-8');
+      const ranges = parseAndMergeNetsetText(text);
+
+      cachedFireholLevel2 = {
+        ranges,
+        lastUpdated: new Date(),
+        source: 'local_backup'
+      };
+      lastFireholLevel2FetchTimeMs = now;
+      return cachedFireholLevel2;
+    } catch {}
+  }
+
+  cachedFireholLevel2 = {
+    ranges: [],
+    lastUpdated: new Date(),
+    source: 'local_backup'
+  };
+  return cachedFireholLevel2;
+}
+
+// 相容舊函式名稱
+export const getOrUpdateFireholRanges = getOrUpdateFireholLevel1Ranges;
 
 /**
  * 取得或更新 Spamhaus DROPv6 (IPv6) 網段資料
@@ -538,18 +626,45 @@ export async function checkSingleIpFirehol(
     };
   }
 
-  const { ranges, lastUpdated, source } = await getOrUpdateFireholRanges();
-  const isListed = isIpNumberInRanges(ipNum, ranges);
+  // 同步比對 Level 1 與 Level 2
+  const [level1, level2] = await Promise.all([
+    getOrUpdateFireholLevel1Ranges(),
+    getOrUpdateFireholLevel2Ranges()
+  ]);
+
+  // 優先比對 Level 1 (嚴重/最高信賴度惡意名單)
+  const isListedLevel1 = isIpNumberInRanges(ipNum, level1.ranges);
+  if (isListedLevel1) {
+    return {
+      ip,
+      isListed: true,
+      threatLevel: 'High Risk (FireHOL Level 1)',
+      source: `FireHOL Level 1 (${level1.source === 'online' ? 'Online Live' : 'Backup'})`,
+      lastUpdated: level1.lastUpdated.toISOString(),
+      message: '⚠️ 該 IPv4 命中 FireHOL Level 1 嚴重惡意黑名單 (確認威脅)'
+    };
+  }
+
+  // 次選比對 Level 2 (近 48 小時活躍攻擊/掃描來源)
+  const isListedLevel2 = isIpNumberInRanges(ipNum, level2.ranges);
+  if (isListedLevel2) {
+    return {
+      ip,
+      isListed: true,
+      threatLevel: 'Medium-High Risk (FireHOL Level 2)',
+      source: `FireHOL Level 2 (${level2.source === 'online' ? 'Online Live' : 'Backup'})`,
+      lastUpdated: level2.lastUpdated.toISOString(),
+      message: '⚠️ 該 IPv4 命中 FireHOL Level 2 惡意黑名單 (近 48 小時活躍攻擊來源)'
+    };
+  }
 
   return {
     ip,
-    isListed,
-    threatLevel: isListed ? 'High Risk (FireHOL Level 1)' : 'Clean / Not Listed',
-    source: `FireHOL Level 1 (${source === 'online' ? 'Online Live' : 'Backup'})`,
-    lastUpdated: lastUpdated.toISOString(),
-    message: isListed
-      ? '⚠️ 該 IPv4 命中 FireHOL Level 1 惡意黑名單'
-      : '✅ 該 IPv4 未在 FireHOL Level 1 黑名單中'
+    isListed: false,
+    threatLevel: 'Clean / Not Listed',
+    source: 'FireHOL Level 1 & Level 2',
+    lastUpdated: level1.lastUpdated.toISOString(),
+    message: '✅ 該 IPv4 未在 FireHOL Level 1 / Level 2 黑名單中'
   };
 }
 
@@ -648,9 +763,10 @@ export async function analyzeCsvWithFirehol(
 ): Promise<FireholCsvAnalysisResult> {
   const startTime = Date.now();
 
-  // 同步預載 IPv4 與 IPv6 雙來源黑名單
-  const [firehol, spamhaus] = await Promise.all([
-    getOrUpdateFireholRanges(),
+  // 同步預載 IPv4 (Level 1, Level 2) 與 IPv6 雙來源黑名單
+  const [fireholL1, fireholL2, spamhaus] = await Promise.all([
+    getOrUpdateFireholLevel1Ranges(),
+    getOrUpdateFireholLevel2Ranges(),
     getOrUpdateSpamhausRanges()
   ]);
 
@@ -664,6 +780,9 @@ export async function analyzeCsvWithFirehol(
   let invalidCount = 0;
   let listedIpCount = 0;
   let listedRequestCount = 0;
+  let level1Count = 0;
+  let level2Count = 0;
+  let spamhausCount = 0;
   const listedIps: FireholListedIpItem[] = [];
 
   for (const line of lines) {
@@ -694,6 +813,7 @@ export async function analyzeCsvWithFirehol(
       if (isListed) {
         listedIpCount++;
         listedRequestCount += docCount;
+        spamhausCount++;
         listedIps.push({
           ip,
           requests: docCount,
@@ -714,14 +834,30 @@ export async function analyzeCsvWithFirehol(
     ipv4Count++;
     totalRequestCount += docCount;
 
-    const isListed = isIpNumberInRanges(ipNum, firehol.ranges);
-    if (isListed) {
+    // 優先比對 Level 1
+    const inLevel1 = isIpNumberInRanges(ipNum, fireholL1.ranges);
+    if (inLevel1) {
       listedIpCount++;
       listedRequestCount += docCount;
+      level1Count++;
       listedIps.push({
         ip,
         requests: docCount,
         source: 'FireHOL Level 1'
+      });
+      continue;
+    }
+
+    // 次選比對 Level 2
+    const inLevel2 = isIpNumberInRanges(ipNum, fireholL2.ranges);
+    if (inLevel2) {
+      listedIpCount++;
+      listedRequestCount += docCount;
+      level2Count++;
+      listedIps.push({
+        ip,
+        requests: docCount,
+        source: 'FireHOL Level 2'
       });
     }
   }
@@ -748,8 +884,11 @@ export async function analyzeCsvWithFirehol(
       listedIpRatio: `${listedIpRatio}%`,
       listedRequestRatio: `${listedRequestRatio}%`,
       durationMs: Date.now() - startTime,
-      source: 'FireHOL Level 1 (IPv4) + Spamhaus DROPv6 (IPv6)',
-      lastUpdated: new Date().toISOString()
+      source: 'FireHOL Level 1 & Level 2 (IPv4) + Spamhaus DROPv6 (IPv6)',
+      lastUpdated: new Date().toISOString(),
+      level1Count,
+      level2Count,
+      spamhausCount
     },
     listedIps
   };

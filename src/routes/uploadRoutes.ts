@@ -79,7 +79,7 @@ router.post('/geolite/csv', uploadCsv.single('file'), uploadAndAnalyzeGeoLiteCsv
  * @openapi
  * /upload/firehol/check:
  *   get:
- *     summary: 查詢單一 IP 是否在線上 FireHOL Level 1 惡意黑名單中
+ *     summary: 查詢單一 IP 是否在線上 FireHOL (Level 1 & Level 2) 或 Spamhaus 黑名單中
  *     tags: [FireHOL]
  *     parameters:
  *       - in: query
@@ -87,10 +87,10 @@ router.post('/geolite/csv', uploadCsv.single('file'), uploadAndAnalyzeGeoLiteCsv
  *         required: true
  *         schema:
  *           type: string
- *         description: 欲查詢的 IPv4 位址 (例如 1.10.16.5)
+ *         description: 欲查詢的 IPv4 或 IPv6 位址 (例如 1.10.16.5 或 2001:db8::1)
  *     responses:
  *       200:
- *         description: 查詢成功，回傳是否命中黑名單與詳細狀態
+ *         $ref: '#/components/responses/FireholSingleIpCheckSuccess'
  *       400:
  *         description: 未提供 IP 參數或格式錯誤
  */
@@ -100,7 +100,7 @@ router.get('/firehol/check', checkIpFirehol);
  * @openapi
  * /upload/firehol/csv:
  *   post:
- *     summary: 上傳 IP CSV 檔案並進行線上 FireHOL Level 1 批次黑名單分析
+ *     summary: 上傳 IP CSV 檔案並進行線上 FireHOL (Level 1 & Level 2) 與 Spamhaus 批次黑名單分析
  *     tags: [FireHOL]
  *     requestBody:
  *       required: true

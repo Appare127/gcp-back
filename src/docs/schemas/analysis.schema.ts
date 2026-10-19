@@ -508,6 +508,17 @@ export const analysisResponses = {
         }
       }
     }
+  },
+
+  FireholSingleIpCheckSuccess: {
+    description: 'FireHOL 單一 IP 黑名單比對成功回應',
+    content: {
+      'application/json': {
+        schema: {
+          $ref: '#/components/schemas/FireholSingleIpCheckResponse'
+        }
+      }
+    }
   }
 };
 
@@ -575,13 +586,28 @@ export const blacklistSchemas = {
       source: {
         type: 'string',
         description: '資料來源 (線上或本機備份)',
-        example: 'FireHOL Level 1 (IPv4) + Spamhaus DROPv6 (IPv6)'
+        example: 'FireHOL Level 1 & Level 2 (IPv4) + Spamhaus DROPv6 (IPv6)'
       },
       lastUpdated: {
         type: 'string',
         format: 'date-time',
         description: '黑名單資料庫最後更新時間',
         example: '2026-10-16T02:42:39.939Z'
+      },
+      level1Count: {
+        type: 'integer',
+        description: '命中 FireHOL Level 1 的 IP 數量',
+        example: 25
+      },
+      level2Count: {
+        type: 'integer',
+        description: '命中 FireHOL Level 2 的 IP 數量',
+        example: 13
+      },
+      spamhausCount: {
+        type: 'integer',
+        description: '命中 Spamhaus DROPv6 的 IPv6 數量',
+        example: 0
       }
     }
   },
@@ -605,7 +631,7 @@ export const blacklistSchemas = {
       },
       source: {
         type: 'string',
-        description: '命中的黑名單來源 (FireHOL Level 1 或 Spamhaus DROPv6)',
+        description: '命中的黑名單來源 (FireHOL Level 1、FireHOL Level 2 或 Spamhaus DROPv6)',
         example: 'FireHOL Level 1'
       }
     }
@@ -648,6 +674,64 @@ export const blacklistSchemas = {
       },
       data: {
         $ref: '#/components/schemas/FireholResultModel'
+      }
+    }
+  },
+
+  /**
+   * FireHOL 單一 IP 查詢結果核心模型
+   */
+  FireholSingleIpCheckModel: {
+    type: 'object',
+    description: 'FireHOL 單一 IP 黑名單比對結果',
+    properties: {
+      ip: {
+        type: 'string',
+        description: '查詢之 IP 位址',
+        example: '1.10.16.5'
+      },
+      isListed: {
+        type: 'boolean',
+        description: '是否命中黑名單 (true: 命中, false: 未命中/乾淨)',
+        example: true
+      },
+      threatLevel: {
+        type: 'string',
+        description: '威脅等級評估',
+        example: 'High Risk (FireHOL Level 1)'
+      },
+      source: {
+        type: 'string',
+        description: '比對之黑名單來源 (FireHOL Level 1、FireHOL Level 2 或 Spamhaus DROPv6)',
+        example: 'FireHOL Level 1 (Online Live)'
+      },
+      lastUpdated: {
+        type: 'string',
+        format: 'date-time',
+        description: '黑名單資料庫最後更新時間',
+        example: '2026-10-19T09:44:42.000Z'
+      },
+      message: {
+        type: 'string',
+        description: '詳細判斷提示訊息',
+        example: '⚠️ 該 IPv4 命中 FireHOL Level 1 嚴重惡意黑名單 (確認威脅)'
+      }
+    }
+  },
+
+  /**
+   * /upload/firehol/check 成功回應包裝模型
+   */
+  FireholSingleIpCheckResponse: {
+    type: 'object',
+    description: 'FireHOL 單一 IP 查詢成功回應結構',
+    properties: {
+      success: {
+        type: 'boolean',
+        example: true
+      },
+      data: {
+        $ref: '#/components/schemas/FireholSingleIpCheckModel'
       }
     }
   }
