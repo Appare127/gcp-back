@@ -14,6 +14,21 @@ export const analysisSchemas = {
         description: '有效 IP 總數',
         example: 177734
       },
+      totalSubnetCount: {
+        type: 'integer',
+        description: '不重複網段總數 (IPv4 /24 + IPv6 /64)',
+        example: 54356
+      },
+      ipv4Count: {
+        type: 'integer',
+        description: 'IPv4 數量',
+        example: 155839
+      },
+      ipv6Count: {
+        type: 'integer',
+        description: 'IPv6 數量',
+        example: 21895
+      },
       totalRequestCount: {
         type: 'integer',
         description: '總請求次數',
@@ -22,7 +37,7 @@ export const analysisSchemas = {
       invalidCount: {
         type: 'integer',
         description: '無效或解析失敗的行數 (如標題列)',
-        example: 1
+        example: 0
       },
       highRiskCategoryCount: {
         type: 'integer',
@@ -31,8 +46,13 @@ export const analysisSchemas = {
       },
       highRiskIpInTop30Count: {
         type: 'integer',
-        description: '前 30 名巨量流量中屬於高風險 ISP 的 IP 數量',
+        description: '前 30 名巨量流量單一 IP 中屬於高風險 ISP 的數量',
         example: 15
+      },
+      highRiskSubnetInTop30Count: {
+        type: 'integer',
+        description: '前 30 名巨量流量網段中屬於高風險的數量',
+        example: 12
       },
       durationMs: {
         type: 'integer',
@@ -78,6 +98,72 @@ export const analysisSchemas = {
   },
 
   /**
+   * Top 30 巨量流量網段項目模型 (IPv4 /24 或 IPv6 /64)
+   */
+  IspTopSubnetItem: {
+    type: 'object',
+    description: '巨量流量聚合網段項目',
+    properties: {
+      rank: {
+        type: 'integer',
+        description: '請求量排名 (1-30)',
+        example: 1
+      },
+      subnet: {
+        type: 'string',
+        description: '聚合網段 (IPv4 為 /24，IPv6 為 /64)',
+        example: '113.185.44.0/24'
+      },
+      ipType: {
+        type: 'string',
+        description: 'IP 協定版本 (IPv4 或 IPv6)',
+        example: 'IPv4'
+      },
+      ipCount: {
+        type: 'integer',
+        description: '該網段內涵蓋的不重複 IP 數量',
+        example: 242
+      },
+      requests: {
+        type: 'integer',
+        description: '該網段產生的總請求次數',
+        example: 263207
+      },
+      asn: {
+        type: 'string',
+        description: '自治系統編號 (ASN)',
+        example: 'AS7552'
+      },
+      org: {
+        type: 'string',
+        description: '所屬組織或業者名稱',
+        example: 'Viettel Group'
+      },
+      country: {
+        type: 'string',
+        description: '地理位置國家代碼與中文名稱 (例如 VN (越南))',
+        example: 'VN (越南)'
+      },
+      category: {
+        type: 'string',
+        description: '所屬產業角色分類',
+        example: '電信業者'
+      },
+      isHighRisk: {
+        type: 'boolean',
+        description: '是否為高風險網段',
+        example: false
+      },
+      sampleIps: {
+        type: 'array',
+        description: '該網段下前幾顆範例 IP',
+        items: { type: 'string' },
+        example: ['113.185.44.1', '113.185.44.2', '113.185.44.3']
+      }
+    }
+  },
+
+  /**
    * Top 30 請求量最高 IP 項目模型
    */
   IspTopIpItem: {
@@ -111,8 +197,8 @@ export const analysisSchemas = {
       },
       country: {
         type: 'string',
-        description: '地理位置國家代碼 (ISO 兩碼)',
-        example: 'HK'
+        description: '地理位置國家代碼與中文名稱 (例如 HK (香港))',
+        example: 'HK (香港)'
       },
       category: {
         type: 'string',
@@ -128,11 +214,71 @@ export const analysisSchemas = {
   },
 
   /**
-   * ISP 分析核心結果模型 (依需求命名的 ispResultModel)
+   * 詳細 IP 清單項目模型 (包含網段、業者、ASN、請求量等完整資訊)
+   */
+  IspDetailedIpItem: {
+    type: 'object',
+    description: '詳細 IP 清單項目',
+    properties: {
+      rank: {
+        type: 'integer',
+        description: '請求量排名',
+        example: 1
+      },
+      ip: {
+        type: 'string',
+        description: '客戶端 IP 位址',
+        example: '167.179.111.165'
+      },
+      country: {
+        type: 'string',
+        description: '地理位置國家代碼與中文名稱 (例如 JP (日本))',
+        example: 'JP (日本)'
+      },
+      asn: {
+        type: 'string',
+        description: '自治系統編號 (ASN)',
+        example: 'AS20473'
+      },
+      org: {
+        type: 'string',
+        description: '所屬組織或業者名稱',
+        example: 'The Constant Company, LLC'
+      },
+      category: {
+        type: 'string',
+        description: '所屬產業角色分類',
+        example: '主機供應商'
+      },
+      subnet: {
+        type: 'string',
+        description: '聚合網段 (IPv4 為 /24，IPv6 為 /64)',
+        example: '167.179.111.0/24'
+      },
+      requests: {
+        type: 'integer',
+        description: '該 IP 產生的請求總量',
+        example: 61
+      },
+      isHighRisk: {
+        type: 'boolean',
+        description: '是否為高風險 IP',
+        example: true
+      },
+      ipType: {
+        type: 'string',
+        description: 'IP 協定版本 (IPv4 或 IPv6)',
+        example: 'IPv4'
+      }
+    }
+  },
+
+  /**
+   * ISP 分析核心結果模型 (雙層呈現：包含 top30Subnets 與 top30Ips)
    */
   ispResultModel: {
     type: 'object',
-    description: 'GeoLite2 ISP 分析結果核心資料模型',
+    description: 'GeoLite2 ISP 分析結果核心資料模型 (支援網段與單一 IP 雙層呈現)',
     properties: {
       overview: {
         $ref: '#/components/schemas/IspOverviewModel'
@@ -144,11 +290,25 @@ export const analysisSchemas = {
           $ref: '#/components/schemas/IspCategorySummaryItem'
         }
       },
+      top30Subnets: {
+        type: 'array',
+        description: '請求量最高前 30 名聚合網段 (/24 與 /64)',
+        items: {
+          $ref: '#/components/schemas/IspTopSubnetItem'
+        }
+      },
       top30Ips: {
         type: 'array',
-        description: '請求量最高前 30 名 IP 交叉分析結果',
+        description: '請求量最高前 30 名單一 IP 交叉分析結果',
         items: {
           $ref: '#/components/schemas/IspTopIpItem'
+        }
+      },
+      detailList: {
+        type: 'array',
+        description: '詳細 IP 清單 (包含 IP、國家、ASN、業者、分類、聚合網段 CIDR、請求次數等)',
+        items: {
+          $ref: '#/components/schemas/IspDetailedIpItem'
         }
       }
     }
@@ -270,11 +430,25 @@ export const analysisSchemas = {
           $ref: '#/components/schemas/IspCategorySummaryItem'
         }
       },
+      top30Subnets: {
+        type: 'array',
+        description: '單一 IP 之網段項目 (相容批次表格)',
+        items: {
+          $ref: '#/components/schemas/IspTopSubnetItem'
+        }
+      },
       top30Ips: {
         type: 'array',
         description: '單一 IP 之 Top 項目 (相容批次表格)',
         items: {
           $ref: '#/components/schemas/IspTopIpItem'
+        }
+      },
+      detailList: {
+        type: 'array',
+        description: '詳細 IP 清單 (相容批次表格)',
+        items: {
+          $ref: '#/components/schemas/IspDetailedIpItem'
         }
       }
     }

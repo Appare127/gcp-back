@@ -43,6 +43,14 @@ router.get('/geolite/check', checkIpGeoLite);
  *   post:
  *     summary: 上傳並即時分析 IP CSV 檔案 (GeoLite2 分析)
  *     tags: [GeoLite2]
+ *     parameters:
+ *       - in: query
+ *         name: includeDetail
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: 是否回傳詳細 IP 清單 (true: 回傳 detailList，預設 false 僅回傳概覽與 Top 30)
  *     requestBody:
  *       required: true
  *       content:
@@ -55,6 +63,10 @@ router.get('/geolite/check', checkIpGeoLite);
  *                 type: string
  *                 format: binary
  *                 description: 請選擇要上傳並分析的 .csv 檔案
+ *               includeDetail:
+ *                 type: boolean
+ *                 default: false
+ *                 description: 是否回傳詳細 IP 清單 (true: 回傳 detailList，預設 false 僅回傳概覽與 Top 30)
  *     responses:
  *       200:
  *         $ref: '#/components/responses/GeoLiteAnalysisSuccess'

@@ -26,8 +26,16 @@ export const uploadAndAnalyzeGeoLiteCsv = catchAsync(
       return next(new AppError('請選擇要上傳的 CSV 檔案', 400));
     }
 
+    // 取得是否回傳詳細 IP 清單開關 (支援 Query 參數與 Form-Data 欄位，預設為 false)
+    const includeDetail =
+      req.query.includeDetail === 'true' ||
+      req.body.includeDetail === 'true' ||
+      req.body.includeDetail === true;
+
     // 調用分析服務解析 Buffer 內容
-    const analysisResult = await analyzeIpCsvStream(req.file.buffer);
+    const analysisResult = await analyzeIpCsvStream(req.file.buffer, {
+      includeDetail
+    });
 
     res.status(200).json({
       success: true,

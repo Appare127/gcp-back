@@ -554,11 +554,49 @@ export async function checkSingleIpFirehol(
 }
 
 /**
- * 判斷是否為 CSV 的標題列 (例如 client_ip,doc_count 或 ip,count)
+ * 清理 CSV 欄位文字：去除前後空白、雙引號或單引號
+ */
+function cleanCsvField(field?: string): string {
+  if (!field) return '';
+  return field
+    .trim()
+    .replace(/^["']+|["']+$/g, '')
+    .trim();
+}
+
+/**
+ * 安全解析單行 CSV，全面相容雙引號包裹與一般純逗號格式
+ */
+function parseCsvLine(line: string): [string, string] {
+  const parts: string[] = [];
+  let current = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"' || char === "'") {
+      inQuotes = !inQuotes;
+    } else if (char === ',' && !inQuotes) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  parts.push(current);
+
+  return [cleanCsvField(parts[0]), cleanCsvField(parts[1])];
+}
+
+/**
+ * 判斷是否為 CSV 的標題列 (相容一般 CSV、帶引號、以及 Kibana/Elasticsearch/繁簡中文等導出格式)
  */
 function isCsvHeader(ipStr: string, rawDocCount?: string): boolean {
-  const lowerIp = ipStr.toLowerCase();
-  const knownIpHeaders = [
+  const cleanIp = cleanCsvField(ipStr).toLowerCase();
+  const cleanCount = cleanCsvField(rawDocCount).toLowerCase();
+
+  // 1. 若首欄包含常見 IP 標題關鍵字
+  const ipKeywords = [
     'client_ip',
     'ip',
     'ip_address',
@@ -567,25 +605,38 @@ function isCsvHeader(ipStr: string, rawDocCount?: string): boolean {
     'remote_addr',
     'source_ip',
     'src_ip',
-    'address'
+    'address',
+    'keyword',
+    '排名',
+    '最前值',
+    '地址',
+    '位址'
   ];
-  if (knownIpHeaders.includes(lowerIp)) {
+  if (ipKeywords.some((kw) => cleanIp.includes(kw))) {
     return true;
   }
-  if (rawDocCount) {
-    const lowerCount = rawDocCount.toLowerCase();
-    const knownCountHeaders = [
+
+  // 2. 若次欄包含計數相關標題關鍵字
+  if (cleanCount) {
+    const countKeywords = [
       'doc_count',
       'count',
       'requests',
       'request_count',
       'total',
-      'hits'
+      'hits',
+      '计数',
+      '計數',
+      '次數',
+      '次数',
+      '記錄',
+      '记录'
     ];
-    if (knownCountHeaders.includes(lowerCount)) {
+    if (countKeywords.some((kw) => cleanCount.includes(kw))) {
       return true;
     }
   }
+
   return false;
 }
 
@@ -618,12 +669,11 @@ export async function analyzeCsvWithFirehol(
   for (const line of lines) {
     if (!line.trim()) continue;
 
-    const parts = line.split(',');
-    const ip = parts[0] ? parts[0].trim() : '';
-    const rawDocCount = parts[1] ? parts[1].trim() : '';
+    // 安全解析單行 CSV，全面相容引號 (例如 "167.179.111.165",61)
+    const [ip, rawDocCount] = parseCsvLine(line);
     const docCount = rawDocCount ? parseInt(rawDocCount, 10) || 1 : 1;
 
-    // 排除標題列 (例如 client_ip,doc_count)
+    // 排除標題列 (例如 client_ip,doc_count 或 "client_ip.keyword 排名最前值","记录计数")
     if (isCsvHeader(ip, rawDocCount)) {
       continue;
     }
