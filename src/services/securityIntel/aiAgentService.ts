@@ -19,9 +19,9 @@ export interface IpAnalysisInputFeatures {
   asn: string;
   org: string;
   category: string;
-  isListed: boolean;
-  blacklistSource?: string;
-  requests?: number;
+  isListed?: boolean | undefined;
+  blacklistSource?: string | undefined;
+  requests?: number | undefined;
 }
 
 // 記憶體快取容器：避免相同特徵或重複查詢的 IP 耗費 API 額度 (TTL 24 小時)

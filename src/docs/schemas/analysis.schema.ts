@@ -314,26 +314,6 @@ export const analysisSchemas = {
     }
   },
 
-  /**
-   * /upload/geolite/csv 成功回應包裝模型
-   */
-  GeoLiteAnalysisResponse: {
-    type: 'object',
-    description: 'GeoLite2 CSV 上傳分析成功回應結構',
-    properties: {
-      success: {
-        type: 'boolean',
-        example: true
-      },
-      message: {
-        type: 'string',
-        example: 'GeoLite2 CSV 分析完成！'
-      },
-      data: {
-        $ref: '#/components/schemas/ispResultModel'
-      }
-    }
-  },
 
   /**
    * 單一 IP GeoLite2 查詢資料核心模型
@@ -413,43 +393,6 @@ export const analysisSchemas = {
             example: 'ai_agent'
           }
         }
-      },
-      blacklist: {
-        type: 'object',
-        description: '線上威脅黑名單比對結果',
-        properties: {
-          isListed: { type: 'boolean', example: false },
-          threatLevel: { type: 'string', example: 'Clean / Not Listed' },
-          source: { type: 'string', example: 'FireHOL Level 1' }
-        }
-      },
-      categorySummary: {
-        type: 'array',
-        description: '單一 IP 之產業分類統計 (相容批次表格)',
-        items: {
-          $ref: '#/components/schemas/IspCategorySummaryItem'
-        }
-      },
-      top30Subnets: {
-        type: 'array',
-        description: '單一 IP 之網段項目 (相容批次表格)',
-        items: {
-          $ref: '#/components/schemas/IspTopSubnetItem'
-        }
-      },
-      top30Ips: {
-        type: 'array',
-        description: '單一 IP 之 Top 項目 (相容批次表格)',
-        items: {
-          $ref: '#/components/schemas/IspTopIpItem'
-        }
-      },
-      detailList: {
-        type: 'array',
-        description: '詳細 IP 清單 (相容批次表格)',
-        items: {
-          $ref: '#/components/schemas/IspDetailedIpItem'
-        }
       }
     }
   },
@@ -477,16 +420,6 @@ export const analysisSchemas = {
 };
 
 export const analysisResponses = {
-  GeoLiteAnalysisSuccess: {
-    description: 'GeoLite2 CSV 分析成功回應',
-    content: {
-      'application/json': {
-        schema: {
-          $ref: '#/components/schemas/GeoLiteAnalysisResponse'
-        }
-      }
-    }
-  },
 
   GeoLiteSingleIpCheckSuccess: {
     description: 'GeoLite2 單一 IP 查詢成功回應',
@@ -499,16 +432,6 @@ export const analysisResponses = {
     }
   },
 
-  FireholAnalysisSuccess: {
-    description: 'FireHOL CSV 黑名單分析成功回應',
-    content: {
-      'application/json': {
-        schema: {
-          $ref: '#/components/schemas/FireholAnalysisResponse'
-        }
-      }
-    }
-  },
 
   FireholSingleIpCheckSuccess: {
     description: 'FireHOL 單一 IP 黑名單比對成功回應',
@@ -519,6 +442,28 @@ export const analysisResponses = {
         }
       }
     }
+  },
+
+  SecurityIntelAnalysisSuccess: {
+    description: '全方位安全情報 CSV 分析成功回應',
+    content: {
+      'application/json': {
+        schema: {
+          $ref: '#/components/schemas/SecurityIntelAnalysisResponse'
+        }
+      }
+    }
+  },
+
+  SecurityIntelSingleIpCheckSuccess: {
+    description: '全方位安全情報單一 IP 查詢成功回應',
+    content: {
+      'application/json': {
+        schema: {
+          $ref: '#/components/schemas/SecurityIntelSingleIpCheckResponse'
+        }
+      }
+    }
   }
 };
 
@@ -526,157 +471,6 @@ export const analysisResponses = {
  * FireHOL 黑名單分析相關的 Swagger / OpenAPI Schema 定義
  */
 export const blacklistSchemas = {
-  /**
-   * FireHOL 分析概覽統計模型
-   */
-  FireholOverviewModel: {
-    type: 'object',
-    description: 'FireHOL 黑名單分析總覽統計',
-    properties: {
-      totalIpCount: {
-        type: 'integer',
-        description: '有效 IP 總數',
-        example: 177734
-      },
-      ipv4Count: {
-        type: 'integer',
-        description: '有效 IPv4 數量 (比對 FireHOL)',
-        example: 155839
-      },
-      ipv6Count: {
-        type: 'integer',
-        description: '有效 IPv6 數量 (比對 Spamhaus DROPv6)',
-        example: 21895
-      },
-      totalRequestCount: {
-        type: 'integer',
-        description: '總請求次數',
-        example: 159498867
-      },
-      invalidCount: {
-        type: 'integer',
-        description: '無效或解析失敗的行數 (如標題列)',
-        example: 1
-      },
-      listedIpCount: {
-        type: 'integer',
-        description: '命中黑名單的 IP 總數',
-        example: 38
-      },
-      listedRequestCount: {
-        type: 'integer',
-        description: '黑名單 IP 產生的請求總量',
-        example: 84520
-      },
-      listedIpRatio: {
-        type: 'string',
-        description: '黑名單 IP 佔比百分比',
-        example: '0.0214%'
-      },
-      listedRequestRatio: {
-        type: 'string',
-        description: '黑名單請求量佔比百分比',
-        example: '0.0530%'
-      },
-      durationMs: {
-        type: 'integer',
-        description: '分析耗時 (毫秒)',
-        example: 15
-      },
-      source: {
-        type: 'string',
-        description: '資料來源 (線上或本機備份)',
-        example: 'FireHOL Level 1 & Level 2 (IPv4) + Spamhaus DROPv6 (IPv6)'
-      },
-      lastUpdated: {
-        type: 'string',
-        format: 'date-time',
-        description: '黑名單資料庫最後更新時間',
-        example: '2026-10-16T02:42:39.939Z'
-      },
-      level1Count: {
-        type: 'integer',
-        description: '命中 FireHOL Level 1 的 IP 數量',
-        example: 25
-      },
-      level2Count: {
-        type: 'integer',
-        description: '命中 FireHOL Level 2 的 IP 數量',
-        example: 13
-      },
-      spamhausCount: {
-        type: 'integer',
-        description: '命中 Spamhaus DROPv6 的 IPv6 數量',
-        example: 0
-      }
-    }
-  },
-
-  /**
-   * 命中黑名單的 IP 項目模型
-   */
-  FireholListedIpItem: {
-    type: 'object',
-    description: '命中黑名單的 IP 項目',
-    properties: {
-      ip: {
-        type: 'string',
-        description: '命中黑名單的 IP 位址',
-        example: '1.10.16.5'
-      },
-      requests: {
-        type: 'integer',
-        description: '該 IP 產生的請求次數',
-        example: 120
-      },
-      source: {
-        type: 'string',
-        description: '命中的黑名單來源 (FireHOL Level 1、FireHOL Level 2 或 Spamhaus DROPv6)',
-        example: 'FireHOL Level 1'
-      }
-    }
-  },
-
-  /**
-   * FireHOL 分析核心結果模型
-   */
-  FireholResultModel: {
-    type: 'object',
-    description: 'FireHOL CSV 分析核心結果模型',
-    properties: {
-      overview: {
-        $ref: '#/components/schemas/FireholOverviewModel'
-      },
-      listedIps: {
-        type: 'array',
-        description: '命中黑名單的 IP 清單 (依請求量遞減排序)',
-        items: {
-          $ref: '#/components/schemas/FireholListedIpItem'
-        }
-      }
-    }
-  },
-
-  /**
-   * /upload/firehol/csv 成功回應包裝模型
-   */
-  FireholAnalysisResponse: {
-    type: 'object',
-    description: 'FireHOL CSV 上傳分析成功回應結構',
-    properties: {
-      success: {
-        type: 'boolean',
-        example: true
-      },
-      message: {
-        type: 'string',
-        example: 'FireHOL 黑名單比對完成！'
-      },
-      data: {
-        $ref: '#/components/schemas/FireholResultModel'
-      }
-    }
-  },
 
   /**
    * FireHOL 單一 IP 查詢結果核心模型
@@ -695,15 +489,20 @@ export const blacklistSchemas = {
         description: '是否命中黑名單 (true: 命中, false: 未命中/乾淨)',
         example: true
       },
-      threatLevel: {
-        type: 'string',
-        description: '威脅等級評估',
-        example: 'High Risk (FireHOL Level 1)'
+      ipv4ListedLevel1: {
+        type: 'boolean',
+        description: '是否命中 FireHOL Level 1 嚴重黑名單 (IPv4)',
+        example: true
       },
-      source: {
-        type: 'string',
-        description: '比對之黑名單來源 (FireHOL Level 1、FireHOL Level 2 或 Spamhaus DROPv6)',
-        example: 'FireHOL Level 1 (Online Live)'
+      ipv4ListedLevel2: {
+        type: 'boolean',
+        description: '是否命中 FireHOL Level 2 活躍攻擊黑名單 (IPv4)',
+        example: false
+      },
+      ipv6SpamhausListed: {
+        type: 'boolean',
+        description: '是否命中 Spamhaus DROPv6 惡意黑名單 (IPv6)',
+        example: false
       },
       lastUpdated: {
         type: 'string',
@@ -733,6 +532,203 @@ export const blacklistSchemas = {
       data: {
         $ref: '#/components/schemas/FireholSingleIpCheckModel'
       }
+    }
+  }
+};
+
+/**
+ * 全方位安全威脅情報 (GeoLite2 + FireHOL + AbuseIPDB) 相關的 Swagger / OpenAPI Schema 定義
+ */
+export const securityIntelSchemas = {
+  /**
+   * 安全情報分析概覽統計模型
+   */
+  SecurityIntelOverviewModel: {
+    type: 'object',
+    description: '全方位安全威脅情報概覽統計指標',
+    properties: {
+      totalIpCount: { type: 'integer', example: 177734 },
+      totalSubnetCount: { type: 'integer', example: 54356 },
+      ipv4Count: { type: 'integer', example: 155839 },
+      ipv6Count: { type: 'integer', example: 21895 },
+      totalRequestCount: { type: 'integer', example: 159498867 },
+      invalidCount: { type: 'integer', example: 0 },
+      highRiskCategoryCount: { type: 'integer', example: 4 },
+      highRiskIpInTop30Count: { type: 'integer', example: 15 },
+      highRiskSubnetInTop30Count: { type: 'integer', example: 12 },
+      fireholListedIpCount: { type: 'integer', description: '命中 FireHOL 或 Spamhaus 的 IP 總數', example: 42 },
+      fireholL1Count: { type: 'integer', description: '命中 FireHOL Level 1 的 IP 數量', example: 25 },
+      fireholL2Count: { type: 'integer', description: '命中 FireHOL Level 2 的 IP 數量', example: 15 },
+      spamhausCount: { type: 'integer', description: '命中 Spamhaus DROPv6 的 IPv6 數量', example: 2 },
+      abuseCheckedCount: { type: 'integer', description: '已取得 AbuseIPDB 情報之 IP 數量', example: 50 },
+      durationMs: { type: 'integer', description: '分析耗時 (毫秒)', example: 480 }
+    }
+  },
+
+  /**
+   * 安全情報 Top 30 IP 模型
+   */
+  SecurityIntelTopIpItem: {
+    type: 'object',
+    description: '前 30 名巨量流量 IP 威脅狀態',
+    properties: {
+      rank: { type: 'integer', example: 1 },
+      ip: { type: 'string', example: '118.25.6.39' },
+      requests: { type: 'integer', example: 284501 },
+      asn: { type: 'string', example: 'AS45090' },
+      org: { type: 'string', example: 'Tencent Cloud' },
+      country: { type: 'string', example: 'CN (中國)' },
+      category: { type: 'string', example: '主機供應商' },
+      fireholStatus: {
+        type: 'string',
+        enum: ['Level 1', 'Level 2', 'Spamhaus', 'Clean'],
+        example: 'Clean'
+      },
+      isFireholListed: { type: 'boolean', example: false },
+      abuseScore: { type: 'integer', nullable: true, example: 7 },
+      isHighRisk: { type: 'boolean', example: true }
+    }
+  },
+
+  /**
+   * 整合詳細表格 IP 清單模型 (GeoLite2 + FireHOL + AbuseIPDB)
+   */
+  SecurityIntelDetailedIpItem: {
+    type: 'object',
+    description: '包含完整地理、黑名單與舉報分數之詳細 IP 項目',
+    properties: {
+      rank: { type: 'integer', example: 1 },
+      ip: { type: 'string', example: '118.25.6.39' },
+      country: { type: 'string', example: 'CN (中國)' },
+      asn: { type: 'string', example: 'AS45090' },
+      org: { type: 'string', example: 'Tencent Cloud Computing' },
+      category: { type: 'string', example: '主機供應商' },
+      subnet: { type: 'string', example: '118.25.6.0/24' },
+      requests: { type: 'integer', example: 284501 },
+      ipType: { type: 'string', enum: ['IPv4', 'IPv6'], example: 'IPv4' },
+      fireholStatus: {
+        type: 'string',
+        enum: ['Level 1', 'Level 2', 'Spamhaus', 'Clean'],
+        description: 'FireHOL 或 Spamhaus 命中狀態',
+        example: 'Clean'
+      },
+      isFireholListed: { type: 'boolean', example: false },
+      abuseScore: {
+        type: 'integer',
+        nullable: true,
+        description: 'AbuseIPDB 信心惡意分數 (0-100)',
+        example: 7
+      },
+      abuseReports: { type: 'integer', description: '被舉報總次數', example: 2 },
+      abuseUsageType: { type: 'string', example: 'Data Center/Web Hosting/Transit' },
+      abuseLastReportedAt: { type: 'string', nullable: true, example: '2026-09-17T22:17:21+00:00' },
+      abuseStatus: {
+        type: 'string',
+        enum: ['cached', 'live', 'quota_exceeded', 'error', 'not_checked', 'key_missing'],
+        example: 'live'
+      },
+      isHighRisk: { type: 'boolean', example: true }
+    }
+  },
+
+  /**
+   * 安全情報 CSV 分析回應模型
+   */
+  SecurityIntelAnalysisResponse: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', example: true },
+      message: { type: 'string', example: '全方位安全威脅情報 CSV 分析完成！' },
+      data: {
+        type: 'object',
+        properties: {
+          overview: { $ref: '#/components/schemas/SecurityIntelOverviewModel' },
+          categorySummary: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/IspCategorySummaryItem' }
+          },
+          top30Subnets: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/IspTopSubnetItem' }
+          },
+          top30Ips: {
+            type: 'array',
+            items: { $ref: '#/components/schemas/SecurityIntelTopIpItem' }
+          },
+          detailList: {
+            type: 'array',
+            description: '詳細 IP 清單 (包含 GeoLite2 + FireHOL + AbuseIPDB 狀態)',
+            items: { $ref: '#/components/schemas/SecurityIntelDetailedIpItem' }
+          }
+        }
+      }
+    }
+  },
+
+  /**
+   * 單一 IP 全方位威脅情報資料模型
+   */
+  SecurityIntelSingleIpCheckModel: {
+    type: 'object',
+    description: '單一 IP 全方位威脅情報資料模型',
+    properties: {
+      ip: { type: 'string', example: '118.25.6.39' },
+      isValid: { type: 'boolean', example: true },
+      ipType: { type: 'string', example: 'IPv4' },
+      country: { type: 'string', example: 'CN (中國)' },
+      countryName: { type: 'string', example: 'China' },
+      city: { type: 'string', example: 'Beijing' },
+      asn: { type: 'string', example: 'AS45090' },
+      org: { type: 'string', example: 'Tencent Cloud Computing' },
+      category: { type: 'string', example: '主機供應商' },
+      firehol: {
+        type: 'object',
+        properties: {
+          isListed: { type: 'boolean', example: false },
+          status: { type: 'string', example: 'Clean' },
+          threatLevel: { type: 'string', example: 'Clean / Not Listed' },
+          message: { type: 'string', example: '✅ 未在任何惡意黑名單中' }
+        }
+      },
+      abuseIpDb: {
+        type: 'object',
+        properties: {
+          ip: { type: 'string', example: '118.25.6.39' },
+          abuseConfidenceScore: { type: 'integer', example: 7 },
+          totalReports: { type: 'integer', example: 2 },
+          usageType: { type: 'string', example: 'Data Center/Web Hosting/Transit' },
+          lastReportedAt: { type: 'string', nullable: true, example: '2026-09-17T22:17:21+00:00' },
+          isWhitelisted: { type: 'boolean', example: false },
+          domain: { type: 'string', example: 'tencentcloud.com' },
+          isp: { type: 'string', example: 'Tencent Cloud' },
+          status: { type: 'string', example: 'live' }
+        }
+      },
+      aiAssessment: { $ref: '#/components/schemas/AiSecurityAssessment' },
+      overallRisk: {
+        type: 'object',
+        properties: {
+          level: { type: 'string', enum: ['High', 'Medium-High', 'Low-Medium', 'Low'], example: 'Medium-High' },
+          isHighRisk: { type: 'boolean', example: true },
+          reasons: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['組織分類為主機供應商', 'AbuseIPDB 信心分數達 7%']
+          }
+        }
+      }
+    }
+  },
+
+  /**
+   * 單一 IP 全方位威脅情報回應模型
+   */
+  SecurityIntelSingleIpCheckResponse: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', example: true },
+      message: { type: 'string', example: '全方位安全威脅情報查詢成功！' },
+      data: { $ref: '#/components/schemas/SecurityIntelSingleIpCheckModel' }
     }
   }
 };

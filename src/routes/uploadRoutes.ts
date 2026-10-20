@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import {
   uploadSingleImage,
-  uploadAndAnalyzeGeoLiteCsv,
   checkIpGeoLite,
   checkIpFirehol,
-  uploadAndAnalyzeFireholCsv,
+  checkIpSecurityIntel,
+  uploadAndAnalyzeSecurityIntelCsv,
   getDriveFiles,
   createFolder,
   deleteFile
@@ -37,43 +37,6 @@ router.post('/single', uploadImage.single('image'), uploadSingleImage);
  */
 router.get('/geolite/check', checkIpGeoLite);
 
-/**
- * @openapi
- * /upload/geolite/csv:
- *   post:
- *     summary: 上傳並即時分析 IP CSV 檔案 (GeoLite2 分析)
- *     tags: [GeoLite2]
- *     parameters:
- *       - in: query
- *         name: includeDetail
- *         required: false
- *         schema:
- *           type: boolean
- *           default: false
- *         description: 是否回傳詳細 IP 清單 (true: 回傳 detailList，預設 false 僅回傳概覽與 Top 30)
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required: [file]
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: 請選擇要上傳並分析的 .csv 檔案
- *               includeDetail:
- *                 type: boolean
- *                 default: false
- *                 description: 是否回傳詳細 IP 清單 (true: 回傳 detailList，預設 false 僅回傳概覽與 Top 30)
- *     responses:
- *       200:
- *         $ref: '#/components/responses/GeoLiteAnalysisSuccess'
- *       400:
- *         description: 未選擇檔案或檔案格式錯誤
- */
-router.post('/geolite/csv', uploadCsv.single('file'), uploadAndAnalyzeGeoLiteCsv);
 
 /**
  * @openapi
@@ -96,12 +59,49 @@ router.post('/geolite/csv', uploadCsv.single('file'), uploadAndAnalyzeGeoLiteCsv
  */
 router.get('/firehol/check', checkIpFirehol);
 
+
 /**
  * @openapi
- * /upload/firehol/csv:
+ * /upload/security-intel/check:
+ *   get:
+ *     summary: 查詢單一 IP 全方位威脅情報 (GeoLite2 + FireHOL L1/L2 + AbuseIPDB + Gemini AI)
+ *     tags: [SecurityIntel]
+ *     parameters:
+ *       - in: query
+ *         name: ip
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 欲查詢的 IPv4 或 IPv6 位址 (例如 118.25.6.39 或 2001:db8::1)
+ *     responses:
+ *       200:
+ *         $ref: '#/components/responses/SecurityIntelSingleIpCheckSuccess'
+ *       400:
+ *         description: 未提供 IP 參數或格式錯誤
+ */
+router.get('/security-intel/check', checkIpSecurityIntel);
+
+/**
+ * @openapi
+ * /upload/security-intel/csv:
  *   post:
- *     summary: 上傳 IP CSV 檔案並進行線上 FireHOL (Level 1 & Level 2) 與 Spamhaus 批次黑名單分析
- *     tags: [FireHOL]
+ *     summary: 上傳 IP CSV 檔案進行全方位威脅情報綜合分析 (GeoLite2 + FireHOL L1/L2 + AbuseIPDB 聚合詳細清單)
+ *     tags: [SecurityIntel]
+ *     parameters:
+ *       - in: query
+ *         name: includeDetail
+ *         required: false
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: 是否回傳詳細 IP 清單 (包含每筆 IP 的 GeoLite2、FireHOL、AbuseIPDB 狀態)
+ *       - in: query
+ *         name: abuseLimit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           default: 50
+ *         description: AbuseIPDB 外部 API 查詢上限 (已快取於 Redis 者不計入此上限)
  *     requestBody:
  *       required: true
  *       content:
@@ -113,14 +113,26 @@ router.get('/firehol/check', checkIpFirehol);
  *               file:
  *                 type: string
  *                 format: binary
- *                 description: 請選擇要上傳並比對 FireHOL 的 .csv 檔案
+ *                 description: 請選擇要上傳並進行綜合安全分析的 .csv 檔案
+ *               includeDetail:
+ *                 type: boolean
+ *                 default: false
+ *                 description: 是否回傳詳細 IP 清單
+ *               abuseLimit:
+ *                 type: integer
+ *                 default: 50
+ *                 description: AbuseIPDB 外部 API 查詢上限
  *     responses:
  *       200:
- *         $ref: '#/components/responses/FireholAnalysisSuccess'
+ *         $ref: '#/components/responses/SecurityIntelAnalysisSuccess'
  *       400:
  *         description: 未選擇檔案或檔案格式錯誤
  */
-router.post('/firehol/csv', uploadCsv.single('file'), uploadAndAnalyzeFireholCsv);
+router.post(
+  '/security-intel/csv',
+  uploadCsv.single('file'),
+  uploadAndAnalyzeSecurityIntelCsv
+);
 
 router.get('/files', getDriveFiles);
 

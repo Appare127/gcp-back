@@ -18,8 +18,11 @@ export async function getHelloMessage(): Promise<any> {
   if (users.length === 0) {
     const newUser = await prisma.user.create({
       data: {
-        name: 'GCP 大師',
-        email: 'test@gcp.com'
+        account: 'master',
+        password: 'password123',
+        email: 'test@gcp.com',
+        birthday: new Date(),
+        phone: '0900000000'
       }
     });
 

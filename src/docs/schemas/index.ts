@@ -11,6 +11,7 @@ import {
 import {
   analysisSchemas,
   blacklistSchemas,
+  securityIntelSchemas,
   analysisResponses
 } from './analysis.schema';
 
@@ -18,7 +19,8 @@ export const allSchemas = {
   ...userSchemas,
   ...articleSchemas,
   ...analysisSchemas,
-  ...blacklistSchemas
+  ...blacklistSchemas,
+  ...securityIntelSchemas
 };
 
 export const allResponses = {

@@ -1,6 +1,6 @@
 # 耿網後端 (gcp-back) 專案技術文件
 
-> **最後更新日期**：2026-10-19
+> **最後更新日期**：2026-10-20
 
 本文件旨在提供 `gcp-back` 後端專案的核心技術架構、資安分析引擎、雲端整合、模組職責與設計規範，以便未來的開發者與 AI 助手快速掌握系統現況與擴充方向。
 
@@ -21,6 +21,7 @@
   * **MaxMind GeoLite2** (`maxmind`)：ASN 與地理位置查詢
   * **FireHOL Level 1 & Level 2**：全球惡意 IP 黑名單比對 (IPv4)
   * **Spamhaus DROPv6**：IPv6 專屬重大威脅網段比對
+  * **AbuseIPDB API v2**：全球社群惡意檢舉歷史、濫用信心指數 (0-100%) 與連線類型情報 (搭配 Redis 24 小時快取)
 * **API 文檔系統**：OpenAPI 3.0 + Swagger UI (`swagger-jsdoc`, `swagger-ui-express`)
 * **安全與加密**：`bcryptjs` (密碼雜湊)、`jsonwebtoken` (JWT 鑑權)、Node.js `crypto` (RSA 非對稱金鑰解密)
 
@@ -46,7 +47,7 @@ HTTP Request
 * **主要模組**：
   * `userRoutes.ts`：會員註冊、登入、個人資料操作。
   * `articleRoutes.ts`：文章增刪改查。
-  * `uploadRoutes.ts`：檔案上傳、GeoLite2 分析、FireHOL 黑名單比對。
+  * `uploadRoutes.ts`：檔案上傳、GeoLite2 單一 IP 查詢、FireHOL 單一 IP 比對、Security Intel 全方位安全情資分析。
 
 ### 2.2 Controllers (控制層，`src/controllers/`)
 * **職責**：處理 HTTP 請求與回應。
@@ -57,33 +58,29 @@ HTTP Request
 
 ### 2.3 Services (服務邏輯層，`src/services/`)
 * **職責**：純商業邏輯與演算法核心。
-* **主要服務**：
-  * [`ipAnalysisService.ts`](file:///d:/code/gcp-back/src/services/ipAnalysisService.ts)：GeoLite2 ASN/地理分析、網段聚合、詳細清單產生。
-  * [`fireholService.ts`](file:///d:/code/gcp-back/src/services/fireholService.ts)：FireHOL Level 1 & Level 2 與 Spamhaus DROPv6 雙軌黑名單引擎。
-  * [`aiAgentService.ts`](file:///d:/code/gcp-back/src/services/aiAgentService.ts)：Gemini AI Agent 即時資安代理屬性評估。
-  * [`userService.ts`](file:///d:/code/gcp-back/src/services/userService.ts)：使用者管理、密碼雜湊、JWT Token 簽發。
+* **主要服務模組**：
+  * **資安情報模組 (`src/services/securityIntel/`)**：
+    * [`index.ts`](file:///d:/code/gcp-back/src/services/securityIntel/index.ts)：統一出口，集中導出所有資安情報函式與型別 (Facade)。
+    * [`types.ts`](file:///d:/code/gcp-back/src/services/securityIntel/types.ts)：情資模組之資料介面與型別定義。
+    * [`providerClassifier.ts`](file:///d:/code/gcp-back/src/services/securityIntel/providerClassifier.ts)：雲端與產業角色分類庫 (含高風險特徵關鍵字)。
+    * [`geoLiteService.ts`](file:///d:/code/gcp-back/src/services/securityIntel/geoLiteService.ts)：MaxMind MMDB 二進位單例讀取與單一 IP 地理／ASN 查詢服務。
+    * [`fireholService.ts`](file:///d:/code/gcp-back/src/services/securityIntel/fireholService.ts)：FireHOL Level 1 & Level 2 與 Spamhaus DROPv6 雙軌黑名單引擎（純情資提供者，專注於二元搜尋區間快取與單一 IP 查詢）。
+    * [`abuseIpDbService.ts`](file:///d:/code/gcp-back/src/services/securityIntel/abuseIpDbService.ts)：AbuseIPDB 社群惡意情資整合、Redis 24 小時快取與平滑限流防護。
+    * [`aiAgentService.ts`](file:///d:/code/gcp-back/src/services/securityIntel/aiAgentService.ts)：Gemini AI Agent 即時資安代理屬性評估。
+    * [`securityIntelService.ts`](file:///d:/code/gcp-back/src/services/securityIntel/securityIntelService.ts)：全方位安全情報主引擎（單一 IP 綜合情資查詢，以及結合 GeoLite2 + FireHOL + AbuseIPDB 的 CSV 巨量串流單趟分析與聚合報表生成）。
+  * **業務服務模組**：
+    * [`userService.ts`](file:///d:/code/gcp-back/src/services/userService.ts)：使用者管理、密碼雜湊、JWT Token 簽發。
+    * [`articleService.ts`](file:///d:/code/gcp-back/src/services/articleService.ts)：文章資料庫存取與業務邏輯。
 
 ---
 
 ## 3. 核心資安防護與情資引擎 (Threat Intelligence Architecture)
 
-### 3.1 GeoLite2 與 ISP 角色分類聚合 (`ipAnalysisService.ts`)
+### 3.1 GeoLite2 地理位置與 ASN 查詢 (`geoLiteService.ts`)
 * **單一 IP 查詢** (`checkSingleIpGeoLite`)：
   * 即時查詢 MaxMind ASN 與 City 資料庫（單例模式讀取器，避免重複載入 60MB 檔案）。
-  * 同步發起 FireHOL 黑名單比對與 Gemini AI Agent 深度評估。
-* **巨量日誌批次聚合分析** (`analyzeIpCsvStream`)：
-  * **引號與格式兼容**：內建 `parseCsvLine`，相容純逗號與帶雙引號（如 Kibana、Elasticsearch 匯出）格式，自動過濾多語系標題列。
-  * **雙層聚合呈現**：
-    1. **單一 IP Top 30**：依真實請求數遞減排序。
-    2. **巨量聚合網段 Top 30**：IPv4 自動聚合為 `/24` (Class C)，IPv6 自動聚合為 `/64`。
-  * **產業角色分類庫 (`classifyProvider`)**：
-    * 涵蓋：主機供應商 (Hosting)、電信業者 (ISP)、CDN／網路防護商、政府機構、教育學術單位等。
-    * 支援全球主要雲端與機房特徵庫（AWS, GCP, Azure, Cloudflare, OVH, Byteplus, The Constant Company 等）。
-  * **效能保護開關 (`includeDetail`)**：
-    * 預設為 `false`，回傳 `detailList: []`，大幅縮減十萬筆日誌的傳輸頻寬與 JSON 序列化開銷。
-    * 當前端傳入 `includeDetail=true` 時，若檔案在 1,000 筆內 **100% 完整呈現**；超過 1,000 筆則取請求量前 1,000 筆詳細資訊，防止前端瀏覽器 DOM 崩潰。
-  * **繁體中文國家格式化 (`formatCountryWithChinese`)**：
-    * 內建全球主要 50+ 國標準繁中對照表，回傳格式為 `代碼 (中文名稱)`（如 `JP (日本)`、`TW (台灣)`、`US (美國)`），無縫對接前端表格。
+  * 呼叫產業分類庫 `classifyProvider` 判定連線身分（主機供應商、ISP、政府機構等）。
+  * 職責徹底純化，專注於 IP 地理屬性與電信商解析，不耦合黑名單或多層報表聚合邏輯。
 
 ### 3.2 FireHOL (Level 1 & Level 2) 與 Spamhaus DROPv6 雙軌黑名單 (`fireholService.ts`)
 * **多層威脅防衛體系**：
@@ -96,6 +93,9 @@ HTTP Request
 * **高可用快取與容災機制**：
   * **記憶體快取**：12 小時 TTL，避免頻繁發起外網請求。
   * **磁碟備援機制**：自動備份至 `data/firehol_level1.netset`、`data/firehol_level2.netset`、`data/spamhaus_dropv6.txt`。若重啟時遇外網斷線，自動降級讀取本地檔案，保證服務 100% 正常。
+* **單一 IP 查詢精準指標 (`checkSingleIpFirehol`)**：
+  * 回傳結構全面移除模糊字串，改以三大獨立布林指標清晰呈現：`ipv4ListedLevel1`、`ipv4ListedLevel2` 與 `ipv6SpamhausListed`。
+  * `isListed` 綜合三項布林狀態，並依命中來源自動產生對應之資安繁中提示訊息 `message`。
 
 ### 3.3 Gemini AI Agent 深度評估引擎 (`aiAgentService.ts`)
 * **模型**：`gemini-3-flash-preview`。
@@ -106,6 +106,39 @@ HTTP Request
 * **快取與備援**：
   * **24 小時記憶體快取**：相同特徵或重複查詢之 IP 不重複耗費 API 額度。
   * **本機規則備援 (`generateFallbackAssessment`)**：AI 瞬斷或 API 逾時時，自動無縫切換至本地靜態規則，確保查詢穩定。
+
+### 3.4 AbuseIPDB 社群惡意情資與 Redis 快取防護 (`abuseIpDbService.ts`)
+* **API 來源**：AbuseIPDB API v2 (`check` 端點，90 天惡意檢舉歷史)。
+* **情報內容**：
+  * `abuseConfidenceScore`：濫用信心指數 (0-100%)，代表社群檢舉之惡意可信度。
+  * `totalReports`：被舉報總次數。
+  * `usageType`：使用類型（例如 `Data Center/Web Hosting/Transit`、`Commercial` 等）。
+  * `lastReportedAt`：最後被社群舉報時間。
+* **Redis 快取與配額保護**：
+  * **24 小時 TTL 快取**：鍵值格式 `abuseipdb:{ip}`，查詢時優先自 Redis 讀取，大幅節省每日 1,000 次之免費配額。
+  * **批量查詢與配額上限 (`batchCheckAbuseDb`)**：
+    * 透過 `redis.mget` 一次性批次取回已快取之 IP。
+    * 對於快取未命中之 IP，提供預設 50 筆之外部查詢上限 (`abuseCheckLimit`)，超過者標記為 `not_checked` 保留額度。
+    * 併發控制與平滑限流（每次最多 2 個同時請求，且批次間加入 200ms 間隔延遲），徹底避免觸發 AbuseIPDB 之 Rate Limit。
+  * **高可用優雅降級**：若無 API Key 或遇到 HTTP 429 配額超額，自動回傳預設狀態而不中斷主流程。
+
+### 3.5 全方位安全情資聚合主引擎 (`securityIntelService.ts`)
+* **核心定位**：
+  * 作為全域資安整合主核心，將原本分散的 CSV 解析、GeoLite2 地理查詢、FireHOL 惡意名單二元搜尋與 AbuseIPDB 批次比對，整合成單一無縫的**單趟（Single-Pass）巨量串流管線**。
+* **主要功能與端點**：
+  * **單一 IP 綜合查詢** (`GET /upload/security-intel/check?ip=...`)：
+    * 同步查詢 GeoLite2、FireHOL L1/L2/Spamhaus、AbuseIPDB 與 Gemini AI，產出整體綜合風險等級 (`overallRisk`)。
+  * **CSV 巨量日誌安全情資分析** (`POST /upload/security-intel/csv`)：
+    * **單趟高效串流處理**：透過 Node.js `readline` 逐行串流解析（支援純逗號與帶雙引號格式，自動跳過多語系標題列），同步完成 IP 計數、IPv4/IPv6 網段聚合（IPv4 `/24`、IPv6 `/64`）。
+    * **在地高效情資直查**：串流過程中對每個相異 IP 直接調用已快取的 GeoLite2 MMDB 讀取器與 FireHOL 二進位/BigInt 二元搜尋，無任何外部 HTTP 阻塞。
+    * **雙層排行與產業統計**：
+      1. **Top 30 IP**：真實請求數最高的前 30 個 IP，附帶 ASN、國籍繁中、產業分類、FireHOL 命中狀態及高風險判定。
+      2. **Top 30 聚合網段**：自動匯總各網段總請求量、涵蓋 IP 數及代表性 Sample IPs。
+      3. **產業分類摘要**：依據 Hosting、ISP、CDN 等分類統計業者數、IP 數與請求總量。
+    * **AbuseIPDB 智慧批次豐富**：僅針對請求量最高的前 30 筆（或包含詳細清單時前 100 筆）進行 Redis 快取讀取與平滑外部補查，極大化 API 配額效益。
+    * **效能保護與詳細清單開關 (`includeDetail`)**：
+      * 預設為 `false`，回傳 `detailList: []`，大幅縮減傳輸頻寬與 JSON 序列化開銷。
+      * 當前端傳入 `includeDetail=true` 時，1,000 筆內完整輸出，超過 1,000 筆則取請求量最高之前 1,000 筆詳細資訊，兼顧深度分析與前端瀏覽器渲染效能。
 
 ---
 
@@ -185,16 +218,24 @@ gcp-back/
 │   │   ├── uploadRoutes.ts      # 資安分析與上傳路由
 │   │   └── userRoutes.ts
 │   ├── services/            # 核心服務與演算法層
-│   │   ├── aiAgentService.ts    # Gemini 3 AI Agent 評估
+│   │   ├── securityIntel/   # 🛡️ 資安情報分析模組
+│   │   │   ├── types.ts                # 情資模組資料介面與型別定義
+│   │   │   ├── providerClassifier.ts   # 雲端與產業角色分類庫
+│   │   │   ├── geoLiteService.ts       # MaxMind MMDB 單例讀取器與單一 IP 查詢服務
+│   │   │   ├── fireholService.ts       # FireHOL L1/L2 + Spamhaus 黑名單引擎
+│   │   │   ├── abuseIpDbService.ts     # AbuseIPDB 威脅情資與 Redis 快取
+│   │   │   ├── aiAgentService.ts       # Gemini 3 AI Agent 評估
+│   │   │   ├── securityIntelService.ts # 全方位安全情資主引擎 (單一 IP 查詢與 CSV 巨量串流分析)
+│   │   │   └── index.ts                # 模組統一匯出進入點 (Facade)
 │   │   ├── articleService.ts
-│   │   ├── fireholService.ts    # FireHOL L1/L2 + Spamhaus 黑名單引擎
 │   │   ├── helloService.ts
-│   │   ├── ipAnalysisService.ts # GeoLite2 ISP 聚合與分類分析
 │   │   └── userService.ts
 │   ├── utils/               # 共用輔助函式庫
 │   │   ├── appError.ts          # 自訂業務錯誤
 │   │   ├── catchAsync.ts        # 非同步異常捕捉
-│   │   └── crypto.ts            # RSA 解密工具
+│   │   ├── crypto.ts            # RSA 解密工具
+│   │   ├── fileUtils.ts         # CSV/檔案行解析、引號清理與標題過濾通用工具
+│   │   └── ipUtils.ts           # IP 數值/BigInt 轉換、CIDR 解析、二元搜尋比對與繁中國別字典
 │   ├── app.ts               # Express App 實例與全域中介軟體掛載
 │   ├── drive.ts             # Google Drive OAuth 2.0 串接
 │   ├── gcs.ts               # Google Cloud Storage 串接

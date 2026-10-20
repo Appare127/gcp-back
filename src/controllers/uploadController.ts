@@ -9,41 +9,12 @@ import {
   deleteDriveFile
 } from '@/drive';
 import {
-  analyzeIpCsvStream,
-  checkSingleIpGeoLite
-} from '@/services/ipAnalysisService';
-import {
+  checkSingleIpGeoLite,
   checkSingleIpFirehol,
-  analyzeCsvWithFirehol
-} from '@/services/fireholService';
+  checkSingleIpSecurityIntel,
+  analyzeSecurityIntelCsv
+} from '@/services/securityIntel';
 
-/**
- * 上傳並即時分析 IP CSV 檔案控制器 (GeoLite2 方法)
- */
-export const uploadAndAnalyzeGeoLiteCsv = catchAsync(
-  async (req: Request, res: Response, next: NextFunction) => {
-    if (!req.file) {
-      return next(new AppError('請選擇要上傳的 CSV 檔案', 400));
-    }
-
-    // 取得是否回傳詳細 IP 清單開關 (支援 Query 參數與 Form-Data 欄位，預設為 false)
-    const includeDetail =
-      req.query.includeDetail === 'true' ||
-      req.body.includeDetail === 'true' ||
-      req.body.includeDetail === true;
-
-    // 調用分析服務解析 Buffer 內容
-    const analysisResult = await analyzeIpCsvStream(req.file.buffer, {
-      includeDetail
-    });
-
-    res.status(200).json({
-      success: true,
-      message: 'GeoLite2 CSV 分析完成！',
-      data: analysisResult
-    });
-  }
-);
 
 /**
  * 查詢單一 IP 的 GeoLite2 (ISP / ASN 與地理位置) 資訊
@@ -84,20 +55,54 @@ export const checkIpFirehol = catchAsync(
   }
 );
 
+
 /**
- * 上傳 CSV 檔案進行線上 FireHOL Level 1 黑名單比對
+ * 查詢單一 IP 的全方位安全威脅情報 (GeoLite2 + FireHOL L1/L2 + AbuseIPDB + Gemini AI)
  */
-export const uploadAndAnalyzeFireholCsv = catchAsync(
+export const checkIpSecurityIntel = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const ip = (req.query.ip as string)?.trim();
+    if (!ip) {
+      return next(new AppError('請提供欲查詢的 IP 參數 (?ip=...)', 400));
+    }
+
+    const result = await checkSingleIpSecurityIntel(ip);
+
+    res.status(200).json({
+      success: true,
+      message: '全方位安全威脅情報查詢成功！',
+      data: result
+    });
+  }
+);
+
+/**
+ * 上傳 CSV 檔案進行全方位安全情報分析 (GeoLite2 + FireHOL L1/L2 + AbuseIPDB 聚合)
+ */
+export const uploadAndAnalyzeSecurityIntelCsv = catchAsync(
   async (req: Request, res: Response, next: NextFunction) => {
     if (!req.file) {
       return next(new AppError('請選擇要上傳的 CSV 檔案', 400));
     }
 
-    const result = await analyzeCsvWithFirehol(req.file.buffer);
+    // 取得是否回傳詳細 IP 清單開關
+    const includeDetail =
+      req.query.includeDetail === 'true' ||
+      req.body.includeDetail === 'true' ||
+      req.body.includeDetail === true;
+
+    // 取得 AbuseIPDB 外部 API 查詢上限 (預設 50)
+    const rawLimit = req.query.abuseLimit || req.body.abuseLimit;
+    const abuseCheckLimit = rawLimit ? parseInt(String(rawLimit), 10) || 50 : 50;
+
+    const result = await analyzeSecurityIntelCsv(req.file.buffer, {
+      includeDetail,
+      abuseCheckLimit
+    });
 
     res.status(200).json({
       success: true,
-      message: 'FireHOL 黑名單比對完成！',
+      message: '全方位安全威脅情報 CSV 分析完成！',
       data: result
     });
   }
