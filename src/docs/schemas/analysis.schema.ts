@@ -464,6 +464,28 @@ export const analysisResponses = {
         }
       }
     }
+  },
+
+  AbuseIpDbSingleIpCheckSuccess: {
+    description: 'AbuseIPDB 單一 IP 查詢成功回應',
+    content: {
+      'application/json': {
+        schema: {
+          $ref: '#/components/schemas/AbuseIpDbSingleIpCheckResponse'
+        }
+      }
+    }
+  },
+
+  AiAgentTestSuccess: {
+    description: 'AI Agent 通訊測試成功回應',
+    content: {
+      'application/json': {
+        schema: {
+          $ref: '#/components/schemas/AiAgentTestResponse'
+        }
+      }
+    }
   }
 };
 
@@ -681,41 +703,65 @@ export const securityIntelSchemas = {
       asn: { type: 'string', example: 'AS45090' },
       org: { type: 'string', example: 'Tencent Cloud Computing' },
       category: { type: 'string', example: '主機供應商' },
-      firehol: {
-        type: 'object',
-        properties: {
-          isListed: { type: 'boolean', example: false },
-          status: { type: 'string', example: 'Clean' },
-          threatLevel: { type: 'string', example: 'Clean / Not Listed' },
-          message: { type: 'string', example: '✅ 未在任何惡意黑名單中' }
-        }
+      subnet: {
+        type: 'string',
+        description: '聚合網段 (IPv4 為 /24，IPv6 為 /64)',
+        example: '118.25.6.0/24'
       },
-      abuseIpDb: {
-        type: 'object',
-        properties: {
-          ip: { type: 'string', example: '118.25.6.39' },
-          abuseConfidenceScore: { type: 'integer', example: 7 },
-          totalReports: { type: 'integer', example: 2 },
-          usageType: { type: 'string', example: 'Data Center/Web Hosting/Transit' },
-          lastReportedAt: { type: 'string', nullable: true, example: '2026-09-17T22:17:21+00:00' },
-          isWhitelisted: { type: 'boolean', example: false },
-          domain: { type: 'string', example: 'tencentcloud.com' },
-          isp: { type: 'string', example: 'Tencent Cloud' },
-          status: { type: 'string', example: 'live' }
-        }
+      firehol: { $ref: '#/components/schemas/FireholSingleIpCheckModel' },
+      abuseIpDb: { $ref: '#/components/schemas/AbuseIpDbSingleIpCheckModel' },
+      aiAssessment: { $ref: '#/components/schemas/AiSecurityAssessment' }
+    }
+  },
+
+  /**
+   * Gemini AI Agent 深度資安評估模型 (含 Google Search 網路即時情資)
+   */
+  AiSecurityAssessment: {
+    type: 'object',
+    description: 'Gemini AI Agent 深度評估 (結合已知情資與 Google Search 網路即時情資)',
+    properties: {
+      connectionType: {
+        type: 'string',
+        description: '連線屬性判定 (例如 Hosting / Datacenter、ISP (家用/寬頻) 等)',
+        example: 'Hosting / Datacenter (雲端主機)'
       },
-      aiAssessment: { $ref: '#/components/schemas/AiSecurityAssessment' },
-      overallRisk: {
-        type: 'object',
-        properties: {
-          level: { type: 'string', enum: ['High', 'Medium-High', 'Low-Medium', 'Low'], example: 'Medium-High' },
-          isHighRisk: { type: 'boolean', example: true },
-          reasons: {
-            type: 'array',
-            items: { type: 'string' },
-            example: ['組織分類為主機供應商', 'AbuseIPDB 信心分數達 7%']
+      riskLevel: {
+        type: 'string',
+        description: '風險等級判定 (例如 極高風險、高風險、中風險、低至中、低風險 等)',
+        example: '高風險'
+      },
+      riskAssessment: {
+        type: 'string',
+        description: '專業資安分析評論 (詳細專業文字說明)',
+        example: '該 IP 屬於機房與資料中心環境，且於公開威脅情資平台查得近期有異常掃描行為...'
+      },
+      onlineFindings: {
+        type: 'string',
+        description: 'Google 搜尋查得之公開威脅情報摘要',
+        example: '查得該 IP 曾於社群情資平台被通報針對 Web 伺服器進行漏洞探測。'
+      },
+      recommendations: {
+        type: 'string',
+        description: '具體資安防禦或處置建議',
+        example: '建議於邊界防火牆或 WAF 針對該 IP 實施嚴格速率限制或加強驗證。'
+      },
+      references: {
+        type: 'array',
+        description: 'Google Search 參考來源清單',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', example: 'AbuseIPDB IP Reports' },
+            uri: { type: 'string', example: 'https://www.abuseipdb.com/check/118.25.6.39' }
           }
         }
+      },
+      source: {
+        type: 'string',
+        enum: ['ai_agent', 'rule_fallback'],
+        description: '評估來源 (ai_agent: Gemini 3 Flash 模型推論、rule_fallback: 本機規則備援)',
+        example: 'ai_agent'
       }
     }
   },
@@ -729,6 +775,144 @@ export const securityIntelSchemas = {
       success: { type: 'boolean', example: true },
       message: { type: 'string', example: '全方位安全威脅情報查詢成功！' },
       data: { $ref: '#/components/schemas/SecurityIntelSingleIpCheckModel' }
+    }
+  },
+
+  /**
+   * AbuseIPDB 單一 IP 查詢資料模型
+   */
+  AbuseIpDbSingleIpCheckModel: {
+    type: 'object',
+    description: 'AbuseIPDB 單一 IP 社群惡意檢舉情報',
+    properties: {
+      ip: { type: 'string', example: '118.25.6.39' },
+      abuseConfidenceScore: {
+        type: 'integer',
+        nullable: true,
+        description: '濫用信心指數 (0-100)，未查詢成功時為 null',
+        example: 7
+      },
+      totalReports: { type: 'integer', description: '90 天內被舉報總次數', example: 2 },
+      usageType: { type: 'string', example: 'Data Center/Web Hosting/Transit' },
+      lastReportedAt: { type: 'string', nullable: true, example: '2026-09-17T22:17:21+00:00' },
+      isWhitelisted: { type: 'boolean', nullable: true, example: false },
+      domain: { type: 'string', example: 'tencent.com' },
+      isp: { type: 'string', example: 'Tencent Cloud Computing (Beijing) Co. Ltd' },
+      status: {
+        type: 'string',
+        enum: ['cached', 'live', 'quota_exceeded', 'error', 'not_checked', 'key_missing'],
+        description: '查詢狀態 (cached: Redis 快取、live: 即時 API、quota_exceeded: 配額超額、error: 查詢失敗、key_missing: 未設定 API Key)',
+        example: 'live'
+      }
+    }
+  },
+
+  /**
+   * /upload/abuseipdb/check 成功回應包裝模型
+   */
+  AbuseIpDbSingleIpCheckResponse: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', example: true },
+      message: { type: 'string', example: 'AbuseIPDB 單一 IP 查詢成功！' },
+      data: { $ref: '#/components/schemas/AbuseIpDbSingleIpCheckModel' }
+    }
+  },
+
+  /**
+   * AI Agent 測試溝通請求模型
+   */
+  AiAgentTestRequest: {
+    type: 'object',
+    properties: {
+      prompt: {
+        type: 'string',
+        description: '測試提示詞或欲諮詢的問題 (未提供時將發送預設資安自我介紹與最新威脅查詢)',
+        example: '請簡要自我介紹你的資安分析職責，並列出近期重大 CVE 漏洞。'
+      },
+      systemInstruction: {
+        type: 'string',
+        description: '系統指示指令 (System Instruction)',
+        example: '你是一位頂尖的資安情資分析專家，請使用繁體中文專業回答。'
+      },
+      enableGoogleSearch: {
+        type: 'boolean',
+        description: '是否啟用 Google Search 即時聯網搜尋工具',
+        example: true
+      },
+      model: {
+        type: 'string',
+        description: '指定 Gemini 模型名稱',
+        example: 'gemini-3-flash-preview'
+      }
+    }
+  },
+
+  /**
+   * AI Agent 測試溝通資料模型
+   */
+  AiAgentTestModel: {
+    type: 'object',
+    description: 'AI Agent 測試溝通結果',
+    properties: {
+      prompt: {
+        type: 'string',
+        description: '發送之提示詞',
+        example: '請簡短自我介紹你的角色與職責。'
+      },
+      reply: {
+        type: 'string',
+        description: 'AI Agent 回應內容 (繁體中文)',
+        example: '您好！我是專門負責資安威脅情報分析的 AI Agent...'
+      },
+      model: {
+        type: 'string',
+        description: '使用的 Gemini 模型',
+        example: 'gemini-3-flash-preview'
+      },
+      googleSearchEnabled: {
+        type: 'boolean',
+        description: '是否啟用 Google Search 即時聯網搜尋',
+        example: true
+      },
+      references: {
+        type: 'array',
+        description: 'Google Search 參考來源清單',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', example: 'National Vulnerability Database' },
+            uri: { type: 'string', example: 'https://nvd.nist.gov' }
+          }
+        }
+      },
+      durationMs: {
+        type: 'integer',
+        description: '推論與檢索耗時 (毫秒)',
+        example: 1250
+      },
+      note: {
+        type: 'string',
+        description: '系統降級或提醒提示 (例如 Google Search 工具配額超限時的降級說明)',
+        example: '⚠️ 偵測到 Google Search 工具目前配額已用盡 (429 RESOURCE_EXHAUSTED)，已自動平滑降級為純模型推論模式。'
+      },
+      timestamp: {
+        type: 'string',
+        description: '回應時間 ISO 8601',
+        example: '2026-10-20T08:00:00.000Z'
+      }
+    }
+  },
+
+  /**
+   * AI Agent 測試溝通成功回應包裝模型
+   */
+  AiAgentTestResponse: {
+    type: 'object',
+    properties: {
+      success: { type: 'boolean', example: true },
+      message: { type: 'string', example: 'AI Agent 通訊測試成功！' },
+      data: { $ref: '#/components/schemas/AiAgentTestModel' }
     }
   }
 };

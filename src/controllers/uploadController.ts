@@ -1,3 +1,4 @@
+import { isIP } from 'node:net';
 import { Request, Response, NextFunction } from 'express';
 import { catchAsync } from '@/utils/catchAsync';
 import { AppError } from '@/utils/appError';
@@ -11,8 +12,10 @@ import {
 import {
   checkSingleIpGeoLite,
   checkSingleIpFirehol,
+  checkSingleIpAbuseDb,
   checkSingleIpSecurityIntel,
-  analyzeSecurityIntelCsv
+  analyzeSecurityIntelCsv,
+  testAiAgentCommunication
 } from '@/services/securityIntel';
 
 
@@ -50,6 +53,31 @@ export const checkIpFirehol = catchAsync(
 
     res.status(200).json({
       success: true,
+      data: result
+    });
+  }
+);
+
+/**
+ * 單獨查詢單一 IP 的 AbuseIPDB 社群惡意檢舉情報 (優先讀取 Redis 24 小時快取)
+ */
+export const checkIpAbuseDb = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const ip = (req.query.ip as string)?.trim();
+    if (!ip) {
+      return next(new AppError('請提供欲查詢的 IP 參數 (?ip=...)', 400));
+    }
+
+    // 先校驗 IP 格式，避免無效請求消耗 AbuseIPDB 每日配額
+    if (isIP(ip) === 0) {
+      return next(new AppError(`IP 格式錯誤：${ip}`, 400));
+    }
+
+    const result = await checkSingleIpAbuseDb(ip);
+
+    res.status(200).json({
+      success: true,
+      message: 'AbuseIPDB 單一 IP 查詢成功！',
       data: result
     });
   }
@@ -103,6 +131,52 @@ export const uploadAndAnalyzeSecurityIntelCsv = catchAsync(
     res.status(200).json({
       success: true,
       message: '全方位安全威脅情報 CSV 分析完成！',
+      data: result
+    });
+  }
+);
+
+/**
+ * 測試與 Gemini AI Agent 的通訊與即時回應 (支援 GET 與 POST)
+ */
+export const testAiAgent = catchAsync(
+  async function (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    // 支援從 body 或 query 獲取參數，方便以 GET 瀏覽器直連或 POST 發送自訂訊息
+    const prompt = (req.body?.prompt ||
+      req.body?.message ||
+      req.query?.prompt ||
+      req.query?.message) as string | undefined;
+
+    const systemInstruction = (req.body?.systemInstruction ||
+      req.query?.systemInstruction) as string | undefined;
+
+    const enableSearchParam =
+      req.body?.enableGoogleSearch ??
+      req.body?.enableSearch ??
+      req.query?.enableGoogleSearch ??
+      req.query?.enableSearch;
+
+    const enableGoogleSearch =
+      enableSearchParam !== undefined
+        ? enableSearchParam === true || enableSearchParam === 'true'
+        : true;
+
+    const model = (req.body?.model || req.query?.model) as string | undefined;
+
+    const result = await testAiAgentCommunication({
+      prompt: prompt?.trim(),
+      systemInstruction: systemInstruction?.trim(),
+      enableGoogleSearch,
+      model: model?.trim()
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'AI Agent 通訊測試成功！',
       data: result
     });
   }

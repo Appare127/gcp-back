@@ -47,7 +47,7 @@ HTTP Request
 * **主要模組**：
   * `userRoutes.ts`：會員註冊、登入、個人資料操作。
   * `articleRoutes.ts`：文章增刪改查。
-  * `uploadRoutes.ts`：檔案上傳、GeoLite2 單一 IP 查詢、FireHOL 單一 IP 比對、Security Intel 全方位安全情資分析。
+  * `uploadRoutes.ts`：檔案上傳、GeoLite2 單一 IP 查詢、FireHOL 單一 IP 比對、AbuseIPDB 單一 IP 查詢、Security Intel 全方位安全情資分析、Gemini AI Agent 即時溝通測試。
 
 ### 2.2 Controllers (控制層，`src/controllers/`)
 * **職責**：處理 HTTP 請求與回應。
@@ -99,13 +99,22 @@ HTTP Request
 
 ### 3.3 Gemini AI Agent 深度評估引擎 (`aiAgentService.ts`)
 * **模型**：`gemini-3-flash-preview`。
-* **評估內容**：
-  * `connectionType`：連線類型判定（如 `ISP (家用/寬頻)`、`Hosting / Datacenter`、`CDN / Proxy`）。
-  * `riskAssessment`：結合黑名單歷史與請求頻次的專業繁中資安摘要評估。
-  * `riskLevel`：風險等級判定（高風險、中風險、低至中、低風險）。
-* **快取與備援**：
-  * **24 小時記憶體快取**：相同特徵或重複查詢之 IP 不重複耗費 API 額度。
-  * **本機規則備援 (`generateFallbackAssessment`)**：AI 瞬斷或 API 逾時時，自動無縫切換至本地靜態規則，確保查詢穩定。
+* **Google Search 即時聯網 Grounding**：
+  * 主動透過 Google 搜尋目標 IP、聚合網段及 ASN 組織之公開資安情資（如 VirusTotal、AbuseIPDB、GreyNoise、Shodan、Cisco Talos 等社群活動紀錄與惡意通報）。
+* **多維度深度評估內容**：
+  * `connectionType`：連線屬性判定（例如 `Hosting / Datacenter (雲端主機)`、`ISP (家用/寬頻)`、`VPN / Proxy`、`CDN / Edge`）。
+  * `riskLevel`：風險等級研判（如 `極高風險`、`高風險`、`中風險`、`低至中`、`低風險` 等）。
+  * `riskAssessment`：專業資安分析評論，充分剖析網路背景、威脅態勢、可能攻擊手法（C2 通訊、殭屍網路肉雞、字典暴力破解、掃描探測或住宅代理池存取等）。
+  * `onlineFindings`：Google 搜尋查得之公開威脅活動與資安通報摘要（查無則明確標示）。
+  * `recommendations`：具體資安防禦或處置建議（防火牆封鎖、限流、加強驗證或正常放行等）。
+  * `references`：Google Search 查得之公開參考來源網址與標題清單。
+* **快取與備援機制**：
+  * **24 小時記憶體快取**：鍵值包含 IP、ASN、黑名單狀態與檢舉分數，避免重複查詢耗費 API 配額。
+  * **本機規則庫優雅降級 (`generateFallbackAssessment`)**：當 Google Search 工具遇 429 配額超限時，自動降級為純模型推論；若模型亦瞬斷、API 逾時或配額超額時，自動切換至本機情資規則庫，保證主流程 100% 穩定不中斷。
+* **AI Agent 通訊測試端點 (`GET / POST /upload/ai-agent/test`)**：
+  * **函式**：[`testAiAgentCommunication`](file:///d:/code/gcp-back/src/services/securityIntel/aiAgentService.ts)。
+  * **功能**：提供開發者與資安人員隨時測試 Agent 的溝通能力、推論品質與 Google Search 即時聯網 Grounding。
+  * **彈性參數**：支援自訂提示詞 (`prompt`)、系統指示 (`systemInstruction`)、是否啟用 Google Search 工具 (`enableGoogleSearch`) 與模型切換 (`model`)。未帶提示詞時自動發送標準資安 Agent 診斷指令。
 
 ### 3.4 AbuseIPDB 社群惡意情資與 Redis 快取防護 (`abuseIpDbService.ts`)
 * **API 來源**：AbuseIPDB API v2 (`check` 端點，90 天惡意檢舉歷史)。
@@ -121,13 +130,17 @@ HTTP Request
     * 對於快取未命中之 IP，提供預設 50 筆之外部查詢上限 (`abuseCheckLimit`)，超過者標記為 `not_checked` 保留額度。
     * 併發控制與平滑限流（每次最多 2 個同時請求，且批次間加入 200ms 間隔延遲），徹底避免觸發 AbuseIPDB 之 Rate Limit。
   * **高可用優雅降級**：若無 API Key 或遇到 HTTP 429 配額超額，自動回傳預設狀態而不中斷主流程。
+* **單獨查詢端點** (`GET /upload/abuseipdb/check?ip=...`)：
+  * 直接呼叫 `checkSingleIpAbuseDb`，僅回傳 AbuseIPDB 情報（不含 GeoLite2 / FireHOL / AI）。
+  * Controller 先以 `net.isIP` 校驗格式，無效 IP 直接回 400，避免浪費外部 API 配額。
 
 ### 3.5 全方位安全情資聚合主引擎 (`securityIntelService.ts`)
 * **核心定位**：
   * 作為全域資安整合主核心，將原本分散的 CSV 解析、GeoLite2 地理查詢、FireHOL 惡意名單二元搜尋與 AbuseIPDB 批次比對，整合成單一無縫的**單趟（Single-Pass）巨量串流管線**。
 * **主要功能與端點**：
   * **單一 IP 綜合查詢** (`GET /upload/security-intel/check?ip=...`)：
-    * 同步查詢 GeoLite2、FireHOL L1/L2/Spamhaus、AbuseIPDB 與 Gemini AI，產出整體綜合風險等級 (`overallRisk`)。
+    * 第一階段以 `Promise.all` 平行獲取在地情資：`checkSingleIpGeoLite`（地理/ASN/網段/組織）、`checkSingleIpFirehol`（L1/L2/Spamhaus 黑名單）與 `checkSingleIpAbuseDb`（社群檢舉歷史）。
+    * 第二階段將上述整合情資全數遞交至 `analyzeIpWithAiAgent`，啟用 Google Search Grounding 即時連網查詢公開情報，回傳全方位深度 CTI 分析報告。
   * **CSV 巨量日誌安全情資分析** (`POST /upload/security-intel/csv`)：
     * **單趟高效串流處理**：透過 Node.js `readline` 逐行串流解析（支援純逗號與帶雙引號格式，自動跳過多語系標題列），同步完成 IP 計數、IPv4/IPv6 網段聚合（IPv4 `/24`、IPv6 `/64`）。
     * **在地高效情資直查**：串流過程中對每個相異 IP 直接調用已快取的 GeoLite2 MMDB 讀取器與 FireHOL 二進位/BigInt 二元搜尋，無任何外部 HTTP 阻塞。

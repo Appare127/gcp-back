@@ -1,5 +1,6 @@
 import { IpSecurityAssessment } from './aiAgentService';
 import { AbuseIpDbResult } from './abuseIpDbService';
+import type { FireholIpCheckResult } from './fireholService';
 
 /**
  * 業者分類與風險標籤
@@ -69,7 +70,9 @@ export interface CategorySummaryItem {
 export interface SecurityIntelDetailedIpItem {
   rank: number;
   ip: string;
-  country: string; // 格式如 "JP (日本)"
+  country: string; // 格式如 "JP (日本)" 或 "JP"
+  countryName?: string;
+  city?: string;
   asn: string;
   org: string;
   category: string;
@@ -77,14 +80,18 @@ export interface SecurityIntelDetailedIpItem {
   requests: number;
   ipType: 'IPv4' | 'IPv6';
   // FireHOL 威脅情報
-  fireholStatus: 'Level 1' | 'Level 2' | 'Spamhaus' | 'Clean';
-  isFireholListed: boolean;
+  firehol?: FireholIpCheckResult;
+  fireholStatus?: 'Level 1' | 'Level 2' | 'Spamhaus' | 'Clean';
+  isFireholListed?: boolean;
   // AbuseIPDB 威脅情報
-  abuseScore: number | null;
-  abuseReports: number;
-  abuseUsageType: string;
-  abuseLastReportedAt: string | null;
-  abuseStatus: string;
+  abuseIpDb?: AbuseIpDbResult;
+  abuseScore?: number | null;
+  abuseReports?: number;
+  abuseUsageType?: string;
+  abuseLastReportedAt?: string | null;
+  abuseStatus?: string;
+  // Gemini AI 即時評估 (參考 checkSingleIpSecurityIntel)
+  aiAssessment?: IpSecurityAssessment;
   // 綜合風險狀態
   isHighRisk: boolean;
 }
@@ -110,7 +117,7 @@ export interface SecurityIntelTopIpItem {
  * 整合安全情報 CSV 分析結果
  */
 export interface SecurityIntelAnalysisResult {
-  overview: {
+  overview?: {
     totalIpCount: number;
     totalSubnetCount: number;
     ipv4Count: number;
@@ -129,9 +136,9 @@ export interface SecurityIntelAnalysisResult {
     abuseCheckedCount: number;
     durationMs: number;
   };
-  categorySummary: CategorySummaryItem[];
-  top30Subnets: TopSubnetItem[];
-  top30Ips: SecurityIntelTopIpItem[];
+  categorySummary?: CategorySummaryItem[];
+  top30Subnets?: TopSubnetItem[];
+  top30Ips?: SecurityIntelTopIpItem[];
   detailList: SecurityIntelDetailedIpItem[];
 }
 
@@ -139,30 +146,30 @@ export interface SecurityIntelAnalysisResult {
  * 單一 IP 整合情報分析結果
  */
 export interface SecurityIntelSingleIpResult {
+  /** IP 位址 */
   ip: string;
+  /** IP 是否有效 */
   isValid: boolean;
+  /** IP 类型: IPv4 或 IPv6 */
   ipType: 'IPv4' | 'IPv6';
+  /** 國家 */
   country: string;
+  /** 國家名稱 */
   countryName: string;
+  /** 城市 */
   city: string;
+  /** 自動系統編號 */
   asn: string;
+  /** 自動系統組織 */
   org: string;
+  /** 產業分類 */
   category: string;
-  // FireHOL 威脅情報
-  firehol: {
-    isListed: boolean;
-    status: 'Level 1' | 'Level 2' | 'Spamhaus' | 'Clean';
-    threatLevel: string;
-    message: string;
-  };
-  // AbuseIPDB 威脅情報
+  /** 聚合網段 (IPv4 為 /24，IPv6 為 /64) */
+  subnet: string;
+  /** FireHOL / Spamhaus 威脅情報 (直接沿用 fireholService 的單一 IP 查詢結果) */
+  firehol: FireholIpCheckResult;
+  /** AbuseIPDB 威脅情報 */
   abuseIpDb: AbuseIpDbResult;
-  // Gemini AI 即時評估
-  aiAssessment: GeoLiteIpCheckResult['aiAssessment'];
-  // 綜合風險判定
-  overallRisk: {
-    level: 'High' | 'Medium-High' | 'Low-Medium' | 'Low';
-    isHighRisk: boolean;
-    reasons: string[];
-  };
+  /** Gemini AI Agent 深度評估 (結合 Google Search 網路即時情資與防禦建議) */
+  aiAssessment?: IpSecurityAssessment;
 }

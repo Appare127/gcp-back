@@ -1,9 +1,7 @@
-import {
-  checkSingleIpGeoLite,
-  getLookupReaders
-} from './geoLiteService';
+import { checkSingleIpGeoLite, getLookupReaders } from './geoLiteService';
 import { classifyProvider } from './providerClassifier';
 import {
+  checkSingleIpFirehol,
   getOrUpdateFireholLevel1Ranges,
   getOrUpdateFireholLevel2Ranges,
   getOrUpdateSpamhausRanges
@@ -22,10 +20,8 @@ import {
   getIpv4Subnet24,
   getIpv6Subnet64
 } from '@/utils/ipUtils';
-import {
-  parseCsvLine,
-  isCsvHeader
-} from '@/utils/fileUtils';
+import { analyzeIpWithAiAgent } from './aiAgentService';
+import { parseCsvLine, isCsvHeader } from '@/utils/fileUtils';
 import type {
   CategorySummaryItem,
   TopSubnetItem,
@@ -80,76 +76,19 @@ function evaluateFireholStatus(
 }
 
 /**
- * 查詢單一 IP 的完整安全威脅情報 (GeoLite2 + FireHOL L1/L2 + AbuseIPDB + Gemini AI)
+ * 查詢單一 IP 的完整安全威脅情報 (GeoLite2 + FireHOL L1/L2/Spamhaus + AbuseIPDB + Gemini AI Agent)
  */
 export async function checkSingleIpSecurityIntel(
   ip: string
 ): Promise<SecurityIntelSingleIpResult> {
-  // 1. 同步發起 GeoLite2、FireHOL 黑名單快取、與 AbuseIPDB 查詢
-  const [geoResult, fireholL1, fireholL2, spamhaus, abuseResult] =
-    await Promise.all([
-      checkSingleIpGeoLite(ip),
-      getOrUpdateFireholLevel1Ranges(),
-      getOrUpdateFireholLevel2Ranges(),
-      getOrUpdateSpamhausRanges(),
-      checkSingleIpAbuseDb(ip)
-    ]);
+  // 1. 同步發起 GeoLite2、FireHOL / Spamhaus 黑名單與 AbuseIPDB 查詢
+  const [geoResult, fireholResult, abuseResult] = await Promise.all([
+    checkSingleIpGeoLite(ip),
+    checkSingleIpFirehol(ip),
+    checkSingleIpAbuseDb(ip)
+  ]);
 
-  // 2. 判斷 FireHOL 狀態
-  const fireholEval = evaluateFireholStatus(
-    ip,
-    fireholL1.ranges,
-    fireholL2.ranges,
-    spamhaus.ranges
-  );
-
-  let fireholThreatLevel = 'Clean / Not Listed';
-  let fireholMessage = '✅ 未在任何惡意黑名單中';
-  if (fireholEval.status === 'Level 1') {
-    fireholThreatLevel = 'High Risk (FireHOL Level 1)';
-    fireholMessage = '⚠️ 該 IP 命中 FireHOL Level 1 最高信賴度惡意黑名單';
-  } else if (fireholEval.status === 'Level 2') {
-    fireholThreatLevel = 'Medium-High Risk (FireHOL Level 2)';
-    fireholMessage = '⚠️ 該 IP 命中 FireHOL Level 2 惡意黑名單 (近 48 小時活躍攻擊來源)';
-  } else if (fireholEval.status === 'Spamhaus') {
-    fireholThreatLevel = 'High Risk (Spamhaus DROPv6)';
-    fireholMessage = '⚠️ 該 IPv6 命中 Spamhaus DROPv6 惡意黑名單';
-  }
-
-  // 3. 綜合評估風險等級
-  const reasons: string[] = [];
-  let isHighRisk = false;
-  let riskLevel: 'High' | 'Medium-High' | 'Low-Medium' | 'Low' = 'Low';
-
-  if (fireholEval.isListed) {
-    reasons.push(fireholMessage);
-    isHighRisk = true;
-    riskLevel = 'High';
-  }
-
-  if (abuseResult.abuseConfidenceScore !== null && abuseResult.abuseConfidenceScore >= 50) {
-    reasons.push(`AbuseIPDB 信心分數達 ${abuseResult.abuseConfidenceScore}% (高風險)`);
-    isHighRisk = true;
-    riskLevel = 'High';
-  } else if (
-    abuseResult.abuseConfidenceScore !== null &&
-    abuseResult.abuseConfidenceScore >= 20
-  ) {
-    reasons.push(`AbuseIPDB 信心分數達 ${abuseResult.abuseConfidenceScore}% (具惡意檢舉歷史)`);
-    if (riskLevel === 'Low') {
-      riskLevel = 'Medium-High';
-    }
-  }
-
-  if (geoResult.classification.isHighRisk) {
-    reasons.push(`組織分類為 ${geoResult.classification.category}`);
-  }
-
-  if (reasons.length === 0) {
-    reasons.push('無任何威脅指標或惡意紀錄');
-  }
-
-  return {
+  const baseResult: Omit<SecurityIntelSingleIpResult, 'aiAssessment'> = {
     ip,
     isValid: geoResult.isValid,
     ipType: geoResult.ipType,
@@ -159,19 +98,19 @@ export async function checkSingleIpSecurityIntel(
     asn: geoResult.asn.asn,
     org: geoResult.asn.org,
     category: geoResult.classification.category,
-    firehol: {
-      isListed: fireholEval.isListed,
-      status: fireholEval.status,
-      threatLevel: fireholThreatLevel,
-      message: fireholMessage
-    },
-    abuseIpDb: abuseResult,
-    aiAssessment: geoResult.aiAssessment,
-    overallRisk: {
-      level: riskLevel,
-      isHighRisk,
-      reasons
-    }
+    // 聚合網段 (IPv4 為 /24，IPv6 為 /64)
+    subnet:
+      geoResult.ipType === 'IPv6' ? getIpv6Subnet64(ip) : getIpv4Subnet24(ip),
+    firehol: fireholResult,
+    abuseIpDb: abuseResult
+  };
+
+  // 2. 將整包情報提供給 AI Agent，結合 Google 搜尋公開網路資料進行專業深度研判
+  // const aiAssessment = await analyzeIpWithAiAgent(baseResult);
+
+  return {
+    ...baseResult
+    // aiAssessment
   };
 }
 
@@ -209,6 +148,8 @@ export async function analyzeSecurityIntelCsv(
     {
       ip: string;
       country: string;
+      countryName: string;
+      city: string;
       asn: string;
       org: string;
       category: string;
@@ -288,11 +229,20 @@ export async function analyzeSecurityIntelCsv(
       cityData?.country?.iso_code ||
       cityData?.registered_country?.iso_code ||
       'Unknown';
+    const countryName =
+      cityData?.country?.names?.['zh-CN'] ||
+      cityData?.country?.names?.en ||
+      'Unknown';
+    const city =
+      cityData?.city?.names?.['zh-CN'] ||
+      cityData?.city?.names?.en ||
+      'Unknown';
     const formattedCountry = formatCountryWithChinese(country, cityData);
     const classification = classifyProvider(asnNumber, asnOrg);
 
     // 網段聚合 (IPv4 /24, IPv6 /64)
-    const subnetKey = ipType === 'IPv6' ? getIpv6Subnet64(ip) : getIpv4Subnet24(ip);
+    const subnetKey =
+      ipType === 'IPv6' ? getIpv6Subnet64(ip) : getIpv4Subnet24(ip);
 
     if (!subnetMap.has(subnetKey)) {
       subnetMap.set(subnetKey, {
@@ -316,6 +266,8 @@ export async function analyzeSecurityIntelCsv(
       ipMap.set(ip, {
         ip,
         country: formattedCountry,
+        countryName,
+        city,
         asn: asnNumber,
         org: asnOrg,
         category: classification.category,
@@ -346,6 +298,7 @@ export async function analyzeSecurityIntelCsv(
     entry.totalRequests += docCount;
   }
 
+  /*
   // 3. 整理 Top 30 網段
   const sortedSubnetList = Array.from(subnetMap.values()).sort(
     (a, b) => b.totalRequests - a.totalRequests
@@ -365,6 +318,7 @@ export async function analyzeSecurityIntelCsv(
       isHighRisk: item.isHighRisk,
       sampleIps: Array.from(item.ipSet).slice(0, 5)
     }));
+  */
 
   // 4. 排序所有 IP (依照請求量由大到小)
   const sortedIps = Array.from(ipMap.values()).sort(
@@ -413,6 +367,7 @@ export async function analyzeSecurityIntelCsv(
     }
   }
 
+  /*
   // 7. 裝配 Top 30 IP 清單 (包含 FireHOL 狀態與 AbuseIPDB 分數)
   const top30Ips: SecurityIntelTopIpItem[] = sortedIps
     .slice(0, 30)
@@ -443,43 +398,75 @@ export async function analyzeSecurityIntelCsv(
         isHighRisk
       };
     });
+  */
 
-  // 8. 裝配詳細表格清單 (只有在 includeDetail 為 true 時才回傳，上限 1000 筆)
-  const detailList: SecurityIntelDetailedIpItem[] = includeDetail
-    ? sortedIps.slice(0, 1000).map((item, index) => {
-        const fStatus = ipFireholMap.get(item.ip) || {
-          status: 'Clean' as const,
-          isListed: false
-        };
-        const abuse = abuseResultMap.get(item.ip);
-        const abuseScore = abuse?.abuseConfidenceScore ?? null;
-        const isHighRisk =
-          item.isHighRisk ||
-          fStatus.isListed ||
-          (abuseScore !== null && abuseScore >= 20);
+  // 8. 裝配詳細表格清單 (參考 checkSingleIpSecurityIntel 作法)
+  const detailList: SecurityIntelDetailedIpItem[] = sortedIps.map(
+    (item, index) => {
+      const fStatus = ipFireholMap.get(item.ip) || {
+        status: 'Clean' as const,
+        isListed: false
+      };
+      const abuse = abuseResultMap.get(item.ip) || {
+        ip: item.ip,
+        abuseConfidenceScore: null,
+        totalReports: 0,
+        usageType: '',
+        domain: '',
+        isp: '',
+        isWhitelisted: null,
+        lastReportedAt: null,
+        status: 'not_checked' as const
+      };
+      const isIpv6 = item.ipType === 'IPv6';
 
-        return {
-          rank: index + 1,
-          ip: item.ip,
-          country: item.country,
-          asn: item.asn,
-          org: item.org,
-          category: item.category,
-          subnet: item.subnet,
-          requests: item.requests,
-          ipType: item.ipType,
-          fireholStatus: fStatus.status,
-          isFireholListed: fStatus.isListed,
-          abuseScore,
-          abuseReports: abuse?.totalReports ?? 0,
-          abuseUsageType: abuse?.usageType || '',
-          abuseLastReportedAt: abuse?.lastReportedAt || null,
-          abuseStatus: abuse?.status || 'not_checked',
-          isHighRisk
-        };
-      })
-    : [];
+      const fireholResult = {
+        ip: item.ip,
+        isListed: fStatus.isListed,
+        ipv4ListedLevel1: !isIpv6 && fStatus.status === 'Level 1',
+        ipv4ListedLevel2: !isIpv6 && fStatus.status === 'Level 2',
+        ipv6SpamhausListed: isIpv6 && fStatus.status === 'Spamhaus',
+        message: fStatus.isListed
+          ? `⚠️ 該 IP 命中 ${fStatus.status} 惡意黑名單`
+          : '✅ 未在任何惡意黑名單中',
+        status: fStatus.status,
+        lastUpdated: fireholL1.lastUpdated.toISOString()
+      };
 
+      const abuseScore = abuse.abuseConfidenceScore ?? null;
+      const isHighRisk =
+        item.isHighRisk ||
+        fStatus.isListed ||
+        (abuseScore !== null && abuseScore >= 20);
+
+      return {
+        rank: index + 1,
+        ip: item.ip,
+        country: item.country,
+        countryName: item.countryName,
+        city: item.city,
+        asn: item.asn,
+        org: item.org,
+        category: item.category,
+        subnet: item.subnet,
+        requests: item.requests,
+        ipType: item.ipType,
+        firehol: fireholResult,
+        abuseIpDb: abuse,
+        fireholStatus: fStatus.status,
+        isFireholListed: fStatus.isListed,
+        abuseScore,
+        abuseReports: abuse.totalReports,
+        abuseUsageType: abuse.usageType || '',
+        abuseLastReportedAt: abuse.lastReportedAt,
+        abuseStatus: abuse.status,
+        isHighRisk
+        // aiAssessment
+      };
+    }
+  );
+
+  /*
   // 9. 彙整產業分類統計
   const sortedAsnList = Array.from(asnSummary.values()).sort(
     (a, b) => b.totalRequests - a.totalRequests
@@ -501,19 +488,19 @@ export async function analyzeSecurityIntelCsv(
     cat.totalRequests += item.totalRequests;
   }
 
-  const categoryTable = Array.from(categorySummaryMap.values()).sort(
-    (a, b) => {
-      if (a.category === '其他（無 ASN／資料不足）') return 1;
-      if (b.category === '其他（無 ASN／資料不足）') return -1;
-      if (a.category === '其他（資料不足）') return 1;
-      if (b.category === '其他（資料不足）') return -1;
-      return b.totalRequests - a.totalRequests;
-    }
-  );
+  const categoryTable = Array.from(categorySummaryMap.values()).sort((a, b) => {
+    if (a.category === '其他（無 ASN／資料不足）') return 1;
+    if (b.category === '其他（無 ASN／資料不足）') return -1;
+    if (a.category === '其他（資料不足）') return 1;
+    if (b.category === '其他（資料不足）') return -1;
+    return b.totalRequests - a.totalRequests;
+  });
   const highRiskCategories = categoryTable.filter((c) => c.isHighRisk);
   const highRiskSubnetsInTop30 = top30Subnets.filter((s) => s.isHighRisk);
+  */
 
   return {
+    /*
     overview: {
       totalIpCount,
       totalSubnetCount: subnetMap.size,
@@ -534,6 +521,7 @@ export async function analyzeSecurityIntelCsv(
     categorySummary: categoryTable,
     top30Subnets,
     top30Ips,
+    */
     detailList
   };
 }
