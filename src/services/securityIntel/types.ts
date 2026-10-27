@@ -139,7 +139,8 @@ export interface SecurityIntelAnalysisResult {
   categorySummary?: CategorySummaryItem[];
   top30Subnets?: TopSubnetItem[];
   top30Ips?: SecurityIntelTopIpItem[];
-  detailList: SecurityIntelDetailedIpItem[];
+  detailList: SecurityIntelSingleIpResult[];
+  hitCount?: number;
 }
 
 /**
@@ -169,7 +170,9 @@ export interface SecurityIntelSingleIpResult {
   /** FireHOL / Spamhaus 威脅情報 (直接沿用 fireholService 的單一 IP 查詢結果) */
   firehol: FireholIpCheckResult;
   /** AbuseIPDB 威脅情報 */
-  abuseIpDb: AbuseIpDbResult;
+  abuseIpDb: AbuseIpDbResult | null;
   /** Gemini AI Agent 深度評估 (結合 Google Search 網路即時情資與防禦建議) */
   aiAssessment?: IpSecurityAssessment;
+  /** 請求數量 */
+  hitCount?: string;
 }

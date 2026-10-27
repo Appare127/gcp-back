@@ -1,4 +1,6 @@
+import { isIP } from 'node:net';
 import { CityResponse } from 'maxmind';
+
 
 /**
  * 常見國家與地區 ISO 代碼之繁體中文對照表
@@ -91,6 +93,43 @@ export function formatCountryWithChinese(
 
   return countryCode;
 }
+
+/**
+ * 清理並正規化 IP 字串 (去除前後空白、引號、IPv4/IPv6 port 與中括號)
+ * @param rawIp 原始 IP 字串
+ */
+export function sanitizeIp(rawIp: string): string {
+  if (!rawIp) return '';
+  const ip = rawIp
+    .replace(/^[\uFEFF\u200B-\u200D]+|[\uFEFF\u200B-\u200D]+$/g, '')
+    .trim()
+    .replace(/^["']+|["']+$/g, '')
+    .trim();
+
+  // 移除帶中括號的 IPv6 格式與可選 port，例如 [2001:db8::1]:8080 或 [2001:db8::1]
+  const ipv6Match = ip.match(/^\[([a-fA-F0-9:]+)\](?::\d+)?$/);
+  if (ipv6Match && ipv6Match[1]) {
+    return ipv6Match[1];
+  }
+
+  // 移除 IPv4 尾隨的 port，例如 192.168.1.1:8080
+  const ipv4Match = ip.match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+$/);
+  if (ipv4Match && ipv4Match[1]) {
+    return ipv4Match[1];
+  }
+
+  return ip;
+}
+
+/**
+ * 校驗字串是否為合法的 IPv4 或 IPv6 位址
+ * @param ip 欲檢查的 IP 字串
+ */
+export function isValidIp(ip: string): boolean {
+  if (!ip) return false;
+  return isIP(ip) !== 0;
+}
+
 
 /**
  * 將 IPv4 字串轉為 32 位元無號數值
