@@ -12,11 +12,20 @@ import {
   deleteFile
 } from '@/controllers/uploadController';
 import { uploadImage, uploadCsv } from '@/middlewares/uploadMiddleware';
+import { requireGoogleDriveEnabled } from '@/middlewares/driveMiddleware';
+import { authenticateToken } from '@/middlewares/authMiddleware';
+import { highCostRateLimiter } from '@/middlewares/rateLimitMiddleware';
 
 const router = Router();
 
 // 'image' 必須跟前端傳來的欄位名稱 (Key) 一致
-router.post('/single', uploadImage.single('image'), uploadSingleImage);
+router.post(
+  '/single',
+  requireGoogleDriveEnabled,
+  authenticateToken,
+  uploadImage.single('image'),
+  uploadSingleImage
+);
 
 /**
  * @openapi
@@ -80,7 +89,12 @@ router.get('/firehol/check', checkIpFirehol);
  *       400:
  *         description: 未提供 IP 參數或格式錯誤
  */
-router.get('/abuseipdb/check', checkIpAbuseDb);
+router.get(
+  '/abuseipdb/check',
+  authenticateToken,
+  highCostRateLimiter,
+  checkIpAbuseDb
+);
 
 
 /**
@@ -102,7 +116,12 @@ router.get('/abuseipdb/check', checkIpAbuseDb);
  *       400:
  *         description: 未提供 IP 參數或格式錯誤
  */
-router.get('/security-intel/check', checkIpSecurityIntel);
+router.get(
+  '/security-intel/check',
+  authenticateToken,
+  highCostRateLimiter,
+  checkIpSecurityIntel
+);
 
 /**
  * @openapi
@@ -153,6 +172,8 @@ router.get('/security-intel/check', checkIpSecurityIntel);
  */
 router.post(
   '/security-intel/csv',
+  authenticateToken,
+  highCostRateLimiter,
   uploadCsv.single('file'),
   uploadAndAnalyzeSecurityIntelCsv
 );
@@ -208,13 +229,13 @@ router.post(
  *       502:
  *         description: 與 AI Agent 通訊失敗
  */
-router.get('/ai-agent/test', testAiAgent);
-router.post('/ai-agent/test', testAiAgent);
+router.get('/ai-agent/test', authenticateToken, highCostRateLimiter, testAiAgent);
+router.post('/ai-agent/test', authenticateToken, highCostRateLimiter, testAiAgent);
 
-router.get('/files', getDriveFiles);
+router.get('/files', requireGoogleDriveEnabled, authenticateToken, getDriveFiles);
 
-router.post('/folder', createFolder);
-router.delete('/files/:id', deleteFile);
+router.post('/folder', requireGoogleDriveEnabled, authenticateToken, createFolder);
+router.delete('/files/:id', requireGoogleDriveEnabled, authenticateToken, deleteFile);
 
 export default router;
 

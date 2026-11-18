@@ -18,15 +18,15 @@ oauth2Client.setCredentials({
 
 const drive = google.drive({ version: 'v3', auth: oauth2Client });
 
-const FOLDER_ID = '1SCRpp-do7Cejf_NK5HC6pthoK4vIogz8'; // 主資料夾ID
-// const FOLDER_ID = '1s-yBkORwQOa4epKok-FJY5hYgo3dMbOb'; // 子資料夾ID
+/** 預設 Google Drive 目標資料夾 ID（從環境變數讀取） */
+const defaultFolderId = process.env.DRIVE_FOLDER_ID || '';
 
 /**
  * 上傳檔案至 Google Drive
  */
 export const uploadToDrive = async (
   file: Express.Multer.File,
-  folderId: string = FOLDER_ID // 設定的哪個資料夾ID，可以選子資料夾
+  folderId: string = defaultFolderId // 設定的哪個資料夾ID，可以選子資料夾
 ): Promise<string> => {
   const { originalname, buffer, mimetype } = file;
 
@@ -37,7 +37,7 @@ export const uploadToDrive = async (
   const response = await drive.files.create({
     requestBody: {
       name: `${Date.now()}-${originalname}`,
-      parents: [FOLDER_ID]
+      ...(folderId ? { parents: [folderId] } : {})
     },
     media: {
       mimeType: mimetype,
@@ -71,10 +71,10 @@ export const uploadToDrive = async (
 /**
  * 查詢指定資料夾內的檔案清單
  */
-export const listDriveFiles = async (folderId: string = FOLDER_ID) => {
+export const listDriveFiles = async (folderId: string = defaultFolderId) => {
   const response = await drive.files.list({
     // q 代表 Query，這句的意思是：找出在某資料夾內且還沒被刪除的檔案
-    q: `'${folderId}' in parents and trashed = false`,
+    q: folderId ? `'${folderId}' in parents and trashed = false` : 'trashed = false',
     // q: `trashed = false`,
     fields: 'files(id, name, webViewLink, mimeType, mimeType, thumbnailLink)',
     // orderBy: 'createdTime desc' // 按時間倒序排列（新的在前）
@@ -89,13 +89,13 @@ export const listDriveFiles = async (folderId: string = FOLDER_ID) => {
  */
 export const createDriveFolder = async (
   folderName: string,
-  parentId: string = FOLDER_ID
+  parentId: string = defaultFolderId
 ) => {
   const response = await drive.files.create({
     requestBody: {
       name: folderName,
       mimeType: 'application/vnd.google-apps.folder',
-      parents: [parentId]
+      ...(parentId ? { parents: [parentId] } : {})
     },
     fields: 'id, name, webViewLink'
   });

@@ -1,6 +1,6 @@
 # 耿網後端 (gcp-back) 專案技術文件
 
-> **最後更新日期**：2026-10-20
+> **最後更新日期**：2026-11-19
 
 本文件旨在提供 `gcp-back` 後端專案的核心技術架構、資安分析引擎、雲端整合、模組職責與設計規範，以便未來的開發者與 AI 助手快速掌握系統現況與擴充方向。
 
@@ -23,7 +23,7 @@
   * **Spamhaus DROPv6**：IPv6 專屬重大威脅網段比對
   * **AbuseIPDB API v2**：全球社群惡意檢舉歷史、濫用信心指數 (0-100%) 與連線類型情報 (搭配 Redis 24 小時快取)
 * **API 文檔系統**：OpenAPI 3.0 + Swagger UI (`swagger-jsdoc`, `swagger-ui-express`)
-* **安全與加密**：`bcryptjs` (密碼雜湊)、`jsonwebtoken` (JWT 鑑權)、Node.js `crypto` (RSA 非對稱金鑰解密)
+* **安全與加密**：`bcryptjs` (密碼雜湊)、`jsonwebtoken` (JWT 鑑權)、Node.js `crypto` (RSA 非對稱金鑰解密)、`helmet` (HTTP 安全標頭)、Redis 請求頻率限制 (`rateLimitMiddleware`)
 
 ---
 
@@ -183,8 +183,11 @@ HTTP Request
 
 ### 5.2 安全性設計
 * **密碼前端加密傳輸**：前端透過 JSEncrypt 使用 RSA 公鑰加密，後端 `src/utils/crypto.ts` 私鑰解密後，再使用 `bcryptjs` 進行 10 次 Salt 加密雜湊儲存。
-* **JWT 鑑權機制**：`src/middlewares/authMiddleware.ts` 驗證 Bearer Token，並將使用者資訊掛載至 `req.user`。
-* **CORS 跨網域**：透過 `cors()` 中介軟體允許前端應用程式跨域連線。
+* **JWT 鑑權機制**：`src/middlewares/authMiddleware.ts` 驗證 Bearer Token，並將使用者資訊掛載至 `req.user`；高成本資安情資 / AI / 雲端操作路由皆強制掛載驗證。
+* **CORS 跨網域白名單**：於 `src/app.ts` 透過 `CORS_ORIGINS` 環境變數控管允許來源（正式環境預設僅允許 `https://appare-kaysen.com` 與 `https://www.appare-kaysen.com`）。
+* **HTTP 安全標頭與代理設定**：掛載 `helmet` 與 `express.json({ limit: '1mb' })`，並設定 `trust proxy`（預設 `TRUST_PROXY_HOPS=2`，對應 Cloudflare ➔ Nginx ➔ Express）。
+* **Redis 分級限流 (`src/middlewares/rateLimitMiddleware.ts`)**：全域 `/api` 每分鐘 100 次上限；高成本端點（AbuseIPDB、Security Intel、AI Agent）每分鐘 10 次上限。
+* **功能開關與文件保護**：`src/middlewares/driveMiddleware.ts` 依 `ENABLE_GOOGLE_DRIVE` 控制 Google Drive 服務開關；正式環境 `/api-docs` 依 `SWAGGER_ALLOWED_IPS` 白名單控管（未設定則回傳 `404`）。
 
 ---
 
@@ -223,7 +226,9 @@ gcp-back/
 │   │       └── analysis.schema.ts
 │   ├── middlewares/         # 中介軟體
 │   │   ├── authMiddleware.ts    # JWT 鑑權
+│   │   ├── driveMiddleware.ts   # Google Drive 功能開關
 │   │   ├── errorMiddleware.ts   # 全域錯誤攔截
+│   │   ├── rateLimitMiddleware.ts # Redis 請求頻率限制
 │   │   └── uploadMiddleware.ts  # Multer 檔案暫存
 │   ├── routes/              # 路由定義層
 │   │   ├── articleRoutes.ts
