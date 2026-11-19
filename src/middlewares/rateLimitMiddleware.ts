@@ -87,3 +87,11 @@ export const highCostRateLimiter = createRateLimiter({
   maxRequests: 10,
   message: '高成本查詢請求過於頻繁，請於 1 分鐘後再試'
 });
+
+/** 登入與註冊防暴力破解限流：每個 IP 每分鐘最多 10 次 */
+export const authRateLimiter = createRateLimiter({
+  prefix: 'api-auth',
+  windowSeconds: 60,
+  maxRequests: 10,
+  message: '認證請求過於頻繁，請於 1 分鐘後再試'
+});

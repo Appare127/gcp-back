@@ -47,6 +47,8 @@ HTTP Request
 * **主要模組**：
   * `userRoutes.ts`：會員註冊、登入、個人資料操作。
   * `articleRoutes.ts`：文章增刪改查。
+  * `resumeRoutes.ts`：履歷公開資訊查詢（如聯絡方式 `/api/resume/contact-info`）。
+  * `healthRoutes.ts`：系統健康檢查（掛載於根路徑 `/health`，不經過 `/api` 限流）。
   * `uploadRoutes.ts`：檔案上傳、GeoLite2 單一 IP 查詢、FireHOL 單一 IP 比對、AbuseIPDB 單一 IP 查詢、Security Intel 全方位安全情資分析、Gemini AI Agent 即時溝通測試。
 
 ### 2.2 Controllers (控制層，`src/controllers/`)
@@ -71,6 +73,8 @@ HTTP Request
   * **業務服務模組**：
     * [`userService.ts`](file:///d:/code/gcp-back/src/services/userService.ts)：使用者管理、密碼雜湊、JWT Token 簽發。
     * [`articleService.ts`](file:///d:/code/gcp-back/src/services/articleService.ts)：文章資料庫存取與業務邏輯。
+    * [`resumeService.ts`](file:///d:/code/gcp-back/src/services/resumeService.ts)：履歷公開聯絡資訊查詢（從 `Resume` 資料表取得啟用中的 `phone` 與 `email`）。
+    * [`healthService.ts`](file:///d:/code/gcp-back/src/services/healthService.ts)：系統健康檢查（探測 PostgreSQL 與 Redis 連線延遲，並讀取 `GIT_COMMIT` 版本短號）。
 
 ---
 
@@ -179,14 +183,21 @@ HTTP Request
 * **非同步捕捉器 (`catchAsync`)**：將 Express Route Handler 包裝成 Promise，出錯時自動 `next(err)`。
 * **全域錯誤中介軟體 (`globalErrorHandler`)**：
   * **開發環境**：回傳詳細的錯誤堆疊 (Stack Trace) 以利除錯。
-  * **生產環境**：隱藏內部程式碼細節，僅回傳安全且友善的錯誤訊息。
+  * **生產環境**：檢查 `err.isOperational`，若為非預期的原生系統錯誤（如資料庫或第三方 SDK 異常），自動遮蔽原生 `err.message` 並統一回傳 `'伺服器內部錯誤，請稍後再試'`，防止內部結構洩漏。
 
 ### 5.2 安全性設計
-* **密碼前端加密傳輸**：前端透過 JSEncrypt 使用 RSA 公鑰加密，後端 `src/utils/crypto.ts` 私鑰解密後，再使用 `bcryptjs` 進行 10 次 Salt 加密雜湊儲存。
-* **JWT 鑑權機制**：`src/middlewares/authMiddleware.ts` 驗證 Bearer Token，並將使用者資訊掛載至 `req.user`；高成本資安情資 / AI / 雲端操作路由皆強制掛載驗證。
+* **密碼前端加密傳輸**：前端可透過 JSEncrypt 使用 RSA 公鑰加密（註冊與登入皆相容 RSA 解密），後端 `src/utils/crypto.ts` 私鑰解密後，再使用 `bcryptjs` 進行 10 次 Salt 加密雜湊儲存。
+* **JWT 鑑權機制**：`src/middlewares/authMiddleware.ts` 優先驗證 HttpOnly Session Cookie (`token`)，並相容 Bearer Token，將使用者資訊掛載至 `req.user`；高成本資安情資 / AI / 雲端操作路由皆強制掛載驗證。
 * **CORS 跨網域白名單**：於 `src/app.ts` 透過 `CORS_ORIGINS` 環境變數控管允許來源（正式環境預設僅允許 `https://appare-kaysen.com` 與 `https://www.appare-kaysen.com`）。
 * **HTTP 安全標頭與代理設定**：掛載 `helmet` 與 `express.json({ limit: '1mb' })`，並設定 `trust proxy`（預設 `TRUST_PROXY_HOPS=2`，對應 Cloudflare ➔ Nginx ➔ Express）。
-* **Redis 分級限流 (`src/middlewares/rateLimitMiddleware.ts`)**：全域 `/api` 每分鐘 100 次上限；高成本端點（AbuseIPDB、Security Intel、AI Agent）每分鐘 10 次上限。
+* **Redis 分級限流 (`src/middlewares/rateLimitMiddleware.ts`)**：
+  * `generalApiRateLimiter`：全域 `/api` 每分鐘 100 次上限。
+  * `authRateLimiter`：登入 (`/api/users/login`) 與註冊 (`/api/users/register`) 防暴力破解每分鐘 10 次上限。
+  * `highCostRateLimiter`：高成本端點（AbuseIPDB、Security Intel、AI Agent）每分鐘 10 次上限。
+* **上傳與參數邊界防護**：
+  * 圖片與 CSV 檔案上傳上限皆限制為 **2MB** (`src/middlewares/uploadMiddleware.ts`)，CSV 單次最多解析 50,000 行且 `abuseLimit` 限制於 `1~100`。
+  * AI Agent 測試端點限制 `prompt` (2,000 字) 與 `systemInstruction` (1,000 字) 長度，並以白名單控管允許的 Gemini 模型。
+  * Google Drive API 操作強制以正則 `/^[a-zA-Z0-9_-]+$/` 校驗 `folderId`、`parentId` 與 `fileId`，防範 Drive Query 語法注入。
 * **功能開關與文件保護**：`src/middlewares/driveMiddleware.ts` 依 `ENABLE_GOOGLE_DRIVE` 控制 Google Drive 服務開關；正式環境 `/api-docs` 依 `SWAGGER_ALLOWED_IPS` 白名單控管（未設定則回傳 `404`）。
 
 ---
@@ -215,15 +226,19 @@ gcp-back/
 │   ├── backend_project_tech_doc.md # 本技術文件
 │   └── google-drive-oauth-guide.md # Google Drive OAuth 整合手冊
 ├── prisma/                  # Prisma ORM 模型配置
-│   └── schema.prisma        # 資料庫 Schema (User, Article)
+│   └── schema.prisma        # 資料庫 Schema (User, Article, Resume)
 ├── src/
 │   ├── controllers/         # 控制層 (HTTP 參數解析與回應封裝)
 │   │   ├── articleController.ts
+│   │   ├── healthController.ts   # 系統健康檢查控制器
+│   │   ├── resumeController.ts   # 履歷公開資訊控制器
 │   │   ├── uploadController.ts   # CSV 與 IP 查詢主要控制器
 │   │   └── userController.ts
 │   ├── docs/                # OpenAPI / Swagger Schema 定義
 │   │   └── schemas/
-│   │       └── analysis.schema.ts
+│   │       ├── analysis.schema.ts
+│   │       ├── health.schema.ts
+│   │       └── resume.schema.ts
 │   ├── middlewares/         # 中介軟體
 │   │   ├── authMiddleware.ts    # JWT 鑑權
 │   │   ├── driveMiddleware.ts   # Google Drive 功能開關
@@ -232,7 +247,9 @@ gcp-back/
 │   │   └── uploadMiddleware.ts  # Multer 檔案暫存
 │   ├── routes/              # 路由定義層
 │   │   ├── articleRoutes.ts
+│   │   ├── healthRoutes.ts      # 系統健康檢查路由 (/health)
 │   │   ├── index.ts             # 根路由聚合 (/api)
+│   │   ├── resumeRoutes.ts      # 履歷相關路由
 │   │   ├── uploadRoutes.ts      # 資安分析與上傳路由
 │   │   └── userRoutes.ts
 │   ├── services/            # 核心服務與演算法層
@@ -246,7 +263,8 @@ gcp-back/
 │   │   │   ├── securityIntelService.ts # 全方位安全情資主引擎 (單一 IP 查詢與 CSV 巨量串流分析)
 │   │   │   └── index.ts                # 模組統一匯出進入點 (Facade)
 │   │   ├── articleService.ts
-│   │   ├── helloService.ts
+│   │   ├── healthService.ts
+│   │   ├── resumeService.ts
 │   │   └── userService.ts
 │   ├── utils/               # 共用輔助函式庫
 │   │   ├── appError.ts          # 自訂業務錯誤
@@ -271,6 +289,6 @@ gcp-back/
 
 * **`npm run dev`**：啟動本地開發服務器 (使用 `tsx watch` 支援熱重載，預設 Port 3000)
 * **`npm run build`**：執行 TypeScript 編譯輸出至 `dist/` 目錄
-* **`npm start`**：以 Node 執行編譯後的生產環境程式碼 (`node dist/server.js`)
+* **`npm start`**：以 Node 載入 `tsconfig-paths/register` 執行編譯後的生產環境程式碼 (`node -r tsconfig-paths/register dist/server.js`)
 * **`npm run lint`**：執行 ESLint 代碼品質與風格檢查
 * **`npm test`**：執行 Jest 單元與整合測試

@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import path from 'path';
 import routes from './routes';
+import healthRoutes from './routes/healthRoutes';
 import { globalErrorHandler } from './middlewares/errorMiddleware';
 import { generalApiRateLimiter } from './middlewares/rateLimitMiddleware';
 import { AppError } from './utils/appError';
@@ -24,7 +25,8 @@ const defaultCorsOrigins =
         'https://appare-kaysen.com',
         'https://www.appare-kaysen.com',
         'http://localhost:5173',
-        'http://localhost:3000'
+        'http://localhost:3000',
+        'http://localhost:3001'
       ];
 
 const allowedOrigins = process.env.CORS_ORIGINS
@@ -92,6 +94,9 @@ app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // 當網址輸入 /uploads 時，去對應到專案目錄下的 public/uploads 資料夾
 app.use('/uploads', express.static(path.join(process.cwd(), 'public/uploads')));
+
+// 系統健康檢查端點（獨立於 /api 之外，避免受 Redis 限流影響）
+app.use('/health', healthRoutes);
 
 // 掛載 API 路由與全域 Redis 限流，所有的路由都會加上 /api 前綴
 app.use('/api', generalApiRateLimiter, routes);

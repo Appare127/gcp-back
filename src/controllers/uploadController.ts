@@ -119,9 +119,12 @@ export const uploadAndAnalyzeSecurityIntelCsv = catchAsync(
       req.body.includeDetail === 'true' ||
       req.body.includeDetail === true;
 
-    // 取得 AbuseIPDB 外部 API 查詢上限 (預設 50)
+    // 取得 AbuseIPDB 外部 API 查詢上限 (預設 50，限制介於 1 ~ 100 之間防止配額被單次請求耗盡)
     const rawLimit = req.query.abuseLimit || req.body.abuseLimit;
-    const abuseCheckLimit = rawLimit ? parseInt(String(rawLimit), 10) || 50 : 50;
+    const parsedLimit = rawLimit ? parseInt(String(rawLimit), 10) : 50;
+    const abuseCheckLimit = Number.isNaN(parsedLimit)
+      ? 50
+      : Math.min(Math.max(1, parsedLimit), 100);
 
     const result = await analyzeSecurityIntelCsv(req.file.buffer, {
       includeDetail,
@@ -166,6 +169,16 @@ export const testAiAgent = catchAsync(
         : true;
 
     const model = (req.body?.model || req.query?.model) as string | undefined;
+
+    if (prompt && prompt.length > 2000) {
+      return next(new AppError('測試提示詞 (prompt) 長度不可超過 2000 字元', 400));
+    }
+
+    if (systemInstruction && systemInstruction.length > 1000) {
+      return next(
+        new AppError('系統指示 (systemInstruction) 長度不可超過 1000 字元', 400)
+      );
+    }
 
     const result = await testAiAgentCommunication({
       prompt: prompt?.trim(),

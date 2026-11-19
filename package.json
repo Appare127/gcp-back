@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch -r dotenv/config src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node -r tsconfig-paths/register dist/server.js",
     "lint": "eslint src",
     "test": "jest --forceExit"
   },
@@ -39,7 +39,8 @@
     "multer": "^2.1.1",
     "pg": "^8.20.0",
     "swagger-jsdoc": "^6.2.8",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "tsconfig-paths": "^4.2.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -60,7 +61,6 @@
     "supertest": "^7.2.2",
     "ts-jest": "^29.4.9",
     "ts-node-dev": "^2.0.0",
-    "tsconfig-paths": "^4.2.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.2"
   }

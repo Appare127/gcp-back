@@ -14,19 +14,25 @@ import {
   securityIntelSchemas,
   analysisResponses
 } from './analysis.schema';
+import { resumeSchemas, resumeResponses } from './resume.schema';
+import { healthSchemas, healthResponses } from './health.schema';
 
 export const allSchemas = {
   ...userSchemas,
   ...articleSchemas,
   ...analysisSchemas,
   ...blacklistSchemas,
-  ...securityIntelSchemas
+  ...securityIntelSchemas,
+  ...resumeSchemas,
+  ...healthSchemas
 };
 
 export const allResponses = {
   ...articleResponses,
   ...userResponses,
-  ...analysisResponses
+  ...analysisResponses,
+  ...resumeResponses,
+  ...healthResponses
 };
 
 export const allRequestBodies = {

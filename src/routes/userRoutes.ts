@@ -3,9 +3,10 @@ import {
   registerUser,
   loginUser,
   getUserInfo,
-  sayHello
+  userLogout
 } from '../controllers/userController';
 import { authenticateToken } from '../middlewares/authMiddleware';
+import { authRateLimiter } from '../middlewares/rateLimitMiddleware';
 
 const router = Router();
 
@@ -21,7 +22,7 @@ const router = Router();
  *       201:
  *         $ref: '#/components/responses/CreatedUser'
  */
-router.post('/register', registerUser);
+router.post('/register', authRateLimiter, registerUser);
 
 /**
  * @openapi
@@ -37,7 +38,7 @@ router.post('/register', registerUser);
  *       401:
  *         description: 帳號或密碼錯誤
  */
-router.post('/login', loginUser);
+router.post('/login', authRateLimiter, loginUser);
 
 /**
  * @openapi
@@ -55,9 +56,16 @@ router.post('/login', loginUser);
  */
 router.get('/info', authenticateToken, getUserInfo);
 
-router.get('/hello', sayHello);
-router.get('/me', authenticateToken, (req, res) => {
-  /* ...原本 /me 的邏輯 ... */
-});
+/**
+ * @openapi
+ * /users/logout:
+ *   post:
+ *     summary: 登出
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: 登出成功
+ */
+router.post('/logout', userLogout);
 
 export default router;

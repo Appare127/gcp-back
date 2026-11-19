@@ -2,17 +2,38 @@ import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
 /**
- * 驗證 JWT 的中介軟體
+ * 從請求的 Cookie Header 解析指定名稱的 Cookie 值
+ */
+function getCookieValue(cookieHeader: string | undefined, name: string): string | undefined {
+  if (!cookieHeader) {
+    return undefined;
+  }
+
+  const prefix = `${name}=`;
+  const parts = cookieHeader.split(';');
+  for (const part of parts) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(prefix)) {
+      return decodeURIComponent(trimmed.slice(prefix.length));
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * 驗證 JWT 的中介軟體（優先讀取 HttpOnly Cookie，並相容 Bearer Token）
  */
 export function authenticateToken(
   req: Request,
   res: Response,
   next: NextFunction
 ) {
-  // 從 Headers 裡面拿通行證 (通常放在 Authorization 這個 Header 裡)
-  // 格式通常是: "Bearer <token>"
+  // 優先從 HttpOnly Cookie 讀取 token，若無則退回檢查 Authorization: Bearer <token>
+  const cookieToken = getCookieValue(req.headers.cookie, 'token');
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
+  const bearerToken = authHeader && authHeader.split(' ')[1];
+  const token = cookieToken || bearerToken;
 
   if (!token) {
     res.status(401).json({ success: false, message: '找不到通行證，請先登入' });

@@ -10,7 +10,6 @@
 // 不該做什麼：不應該參與真正的「業務邏輯判斷」或「下 SQL 指令」。它的任務只是「HTTP 協定」與「業務邏輯」之間的橋樑。
 
 import type { Request, Response, NextFunction } from 'express';
-import { getHelloMessage } from '../services/helloService';
 import {
   createUserService,
   loginUserService,
@@ -19,19 +18,19 @@ import {
 
 import { AppError } from '../utils/appError';
 import { catchAsync } from '../utils/catchAsync';
+import { decryptWithRsa } from '../utils/crypto';
 
-export async function sayHello(req: Request, res: Response): Promise<void> {
+/**
+ * 嘗試以 RSA 私鑰解密密碼；若傳入本身已是明文（例如註冊前端直接傳明文或本地測試），則回傳原字串
+ */
+function resolvePlainPassword(inputPassword: unknown): string {
+  if (typeof inputPassword !== 'string' || !inputPassword) {
+    return '';
+  }
   try {
-    // 👇 這裡加上 await 等待 Service 從資料庫拿資料回來
-    const result = await getHelloMessage();
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    // 順便把錯誤印在後端終端機，方便我們未來除錯
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Server Error' });
+    return decryptWithRsa(inputPassword);
+  } catch {
+    return inputPassword;
   }
 }
 
@@ -90,10 +89,15 @@ function validateRegisterData(data: any): {
 // === 修改我們原本的註冊 Controller ===
 export async function registerUser(req: Request, res: Response): Promise<void> {
   try {
-    const { account, password, email, birthday, phone } = req.body;
+    // 支援前端傳送 RSA 加密密文或明文密碼，先還原出真實密碼再進行格式校驗與雜湊
+    const plainPassword = resolvePlainPassword(req.body?.password);
+    const registerPayload = {
+      ...req.body,
+      password: plainPassword
+    };
 
     // ▼ ▼ 在這裡把守門員 (驗證) 加進去！ ▼ ▼
-    const validationResult = validateRegisterData(req.body);
+    const validationResult = validateRegisterData(registerPayload);
     if (!validationResult.isValid) {
       // 驗證沒通過，直接給 400 錯誤並退回
       res.status(400).json({
@@ -103,8 +107,8 @@ export async function registerUser(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 把檢查過關的 req.body 丟進 Service 裡面處理
-    const serviceResult = await createUserService(req.body);
+    // 把檢查過關的資料丟進 Service 裡面處理
+    const serviceResult = await createUserService(registerPayload);
     if (!serviceResult.success) {
       // 如果 Service 說失敗 (例如帳號重複)，一樣退回 400 錯誤
       res.status(400).json({
@@ -117,7 +121,7 @@ export async function registerUser(req: Request, res: Response): Promise<void> {
     // 全部通關，回傳 201 成功，並附上剛建立的使用者資料（不含密碼）
     res.status(201).json({
       success: true,
-      message: '註冊大成功！',
+      message: '註冊成功！',
       data: serviceResult.user
     });
   } catch (error) {
@@ -145,13 +149,21 @@ export const loginUser = catchAsync(
       account,
       password
     });
-    if (!serviceResult.success) {
+    if (!serviceResult.success || !serviceResult.token) {
       return next(new AppError(serviceResult.message || '登入失敗', 401));
     }
+
+    // 設定 HttpOnly Session Cookie（不設定 maxAge 與 expires，關閉瀏覽器即自動清除）
+    res.cookie('token', serviceResult.token, {
+      httpOnly: true, // 禁止前端 JS 讀取，防範 XSS
+      secure: process.env.NODE_ENV === 'production', // 線上 HTTPS 環境強制加密傳輸
+      sameSite: 'lax', // 防範 CSRF
+      path: '/'
+    });
+
     res.status(200).json({
       success: true,
       message: '登入成功!',
-      token: serviceResult.token,
       user: serviceResult.user
     });
   }
@@ -185,41 +197,16 @@ export const getUserInfo = catchAsync(
   }
 );
 
-// /**
-//  * 處理登入請求的控制器
-//  */
-// export async function loginUser(req: Request, res: Response): Promise<void> {
-//   try {
-//     const { account, password } = req.body;
+export const userLogout = catchAsync(async (req: Request, res: Response) => {
+  res.clearCookie('token', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/'
+  });
 
-//     // 1. 基本檢查：是否有填寫帳號密碼
-//     if (!account || !password) {
-//       res.status(400).json({ success: false, message: '請輸入帳號與密碼' });
-//       return;
-//     }
-
-//     // 2. 呼叫 Service 執行登入邏輯
-//     const serviceResult = await loginUserService({ account, password });
-
-//     if (!serviceResult.success) {
-//       // 登入失敗 (帳號不存在或密碼錯誤)
-//       res.status(401).json({
-//         // 401 代表 Unauthorized (未授權)
-//         success: false,
-//         message: serviceResult.message
-//       });
-//       return;
-//     }
-
-//     // 3. 登入成功，回傳 Token
-//     res.status(200).json({
-//       success: true,
-//       message: '登入成功！',
-//       token: serviceResult.token, // 回傳剛剛核發的通行證
-//       user: serviceResult.user // 以及使用者基本資料
-//     });
-//   } catch (error) {
-//     console.error('登入發生錯誤：', error);
-//     res.status(500).json({ success: false, message: '伺服器內部錯誤' });
-//   }
-// }
+  res.status(200).json({
+    success: true,
+    message: '登出成功'
+  });
+});

@@ -36,3 +36,12 @@ model Article {
   author    User     @relation(fields: [authorId], references: [id])
 }
 
+model Resume {
+  id        Int      @id @default(autoincrement())
+  phone     String
+  email     String
+  isActive  Boolean  @default(true) // 可用來標記目前啟用的履歷版本
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+

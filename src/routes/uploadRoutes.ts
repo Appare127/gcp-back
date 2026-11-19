@@ -143,7 +143,9 @@ router.get(
  *         schema:
  *           type: integer
  *           default: 50
- *         description: AbuseIPDB 外部 API 查詢上限 (已快取於 Redis 者不計入此上限)
+ *           minimum: 1
+ *           maximum: 100
+ *         description: AbuseIPDB 外部 API 查詢上限 (1~100，已快取於 Redis 者不計入此上限)
  *     requestBody:
  *       required: true
  *       content:
@@ -155,7 +157,7 @@ router.get(
  *               file:
  *                 type: string
  *                 format: binary
- *                 description: 請選擇要上傳並進行綜合安全分析的 .csv 檔案
+ *                 description: 請選擇要上傳並進行綜合安全分析的 .csv 檔案 (上限 2MB)
  *               includeDetail:
  *                 type: boolean
  *                 default: false
@@ -163,7 +165,9 @@ router.get(
  *               abuseLimit:
  *                 type: integer
  *                 default: 50
- *                 description: AbuseIPDB 外部 API 查詢上限
+ *                 minimum: 1
+ *                 maximum: 100
+ *                 description: AbuseIPDB 外部 API 查詢上限 (1~100)
  *     responses:
  *       200:
  *         $ref: '#/components/responses/SecurityIntelAnalysisSuccess'

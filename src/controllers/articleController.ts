@@ -17,6 +17,9 @@ export const createArticle = catchAsync(
 
     const article = await createArticleService(userId, req.body);
 
+    // 清除文章列表快取，確保下次讀取到最新文章清單
+    await redis.del('all_articles').catch(() => {});
+
     res.status(201).json({
       success: true,
       data: article

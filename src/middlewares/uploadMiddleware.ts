@@ -58,12 +58,12 @@ function csvFileFilter(
 }
 
 /**
- * CSV 檔案上傳中介軟體（限制 50MB，記憶體緩衝區模式）
+ * CSV 檔案上傳中介軟體（限制 2MB，記憶體緩衝區模式）
  */
 export const uploadCsv = multer({
   storage: storage,
   fileFilter: csvFileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024 // 限制 50MB
+    fileSize: 2 * 1024 * 1024 // 限制 2MB
   }
 });

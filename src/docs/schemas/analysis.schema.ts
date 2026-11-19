@@ -827,12 +827,14 @@ export const securityIntelSchemas = {
     properties: {
       prompt: {
         type: 'string',
-        description: '測試提示詞或欲諮詢的問題 (未提供時將發送預設資安自我介紹與最新威脅查詢)',
+        maxLength: 2000,
+        description: '測試提示詞或欲諮詢的問題 (上限 2000 字元，未提供時將發送預設資安自我介紹與最新威脅查詢)',
         example: '請簡要自我介紹你的資安分析職責，並列出近期重大 CVE 漏洞。'
       },
       systemInstruction: {
         type: 'string',
-        description: '系統指示指令 (System Instruction)',
+        maxLength: 1000,
+        description: '系統指示指令 (System Instruction，上限 1000 字元)',
         example: '你是一位頂尖的資安情資分析專家，請使用繁體中文專業回答。'
       },
       enableGoogleSearch: {
@@ -842,7 +844,13 @@ export const securityIntelSchemas = {
       },
       model: {
         type: 'string',
-        description: '指定 Gemini 模型名稱',
+        enum: [
+          'gemini-3-flash-preview',
+          'gemini-2.5-flash',
+          'gemini-2.5-pro',
+          'gemini-2.0-flash'
+        ],
+        description: '指定允許白名單內之 Gemini 模型名稱',
         example: 'gemini-3-flash-preview'
       }
     }

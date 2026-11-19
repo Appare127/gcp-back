@@ -85,7 +85,6 @@ export const userSchemas = {
     properties: {
       success: { type: 'boolean', example: true },
       message: { type: 'string', example: '登入成功!' },
-      token: { type: 'string', description: 'JWT 通行證' },
       user: {
         $ref: '#/components/schemas/UserModel'
       }

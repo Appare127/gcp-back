@@ -28,8 +28,13 @@ const options: swaggerJsdoc.Options = {
       requestBodies: allRequestBodies
     }
   },
-  // 指定要掃描哪些檔案裡面的註解來產生文件
-  apis: ['./src/routes/*.ts', './src/controllers/*.ts']
+  // 指定要掃描哪些檔案裡面的註解來產生文件（同時相容本機 src/*.ts 與正式環境編譯後 dist/*.js）
+  apis: [
+    './src/routes/*.ts',
+    './src/controllers/*.ts',
+    './dist/routes/*.js',
+    './dist/controllers/*.js'
+  ]
 };
 
 export const swaggerSpec = swaggerJsdoc(options);

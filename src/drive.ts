@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
 import dotenv from 'dotenv';
+import { AppError } from './utils/appError';
 
 dotenv.config();
 
@@ -21,6 +22,18 @@ const drive = google.drive({ version: 'v3', auth: oauth2Client });
 /** 預設 Google Drive 目標資料夾 ID（從環境變數讀取） */
 const defaultFolderId = process.env.DRIVE_FOLDER_ID || '';
 
+/** Google Drive 檔案與資料夾 ID 合法格式正則（僅允許英數、底線與連字號，防止 Drive Query 注入） */
+const DRIVE_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
+
+/**
+ * 驗證 Google Drive 檔案或資料夾 ID 格式是否安全合法
+ */
+function validateDriveId(id: string, label = '資料夾 ID'): void {
+  if (!DRIVE_ID_REGEX.test(id)) {
+    throw new AppError(`無效的 Google Drive ${label} 格式`, 400);
+  }
+}
+
 /**
  * 上傳檔案至 Google Drive
  */
@@ -28,6 +41,9 @@ export const uploadToDrive = async (
   file: Express.Multer.File,
   folderId: string = defaultFolderId // 設定的哪個資料夾ID，可以選子資料夾
 ): Promise<string> => {
+  if (folderId) {
+    validateDriveId(folderId, '資料夾 ID');
+  }
   const { originalname, buffer, mimetype } = file;
 
   const bufferStream = new Readable();
@@ -72,6 +88,9 @@ export const uploadToDrive = async (
  * 查詢指定資料夾內的檔案清單
  */
 export const listDriveFiles = async (folderId: string = defaultFolderId) => {
+  if (folderId) {
+    validateDriveId(folderId, '資料夾 ID');
+  }
   const response = await drive.files.list({
     // q 代表 Query，這句的意思是：找出在某資料夾內且還沒被刪除的檔案
     q: folderId ? `'${folderId}' in parents and trashed = false` : 'trashed = false',
@@ -91,6 +110,9 @@ export const createDriveFolder = async (
   folderName: string,
   parentId: string = defaultFolderId
 ) => {
+  if (parentId) {
+    validateDriveId(parentId, '父資料夾 ID');
+  }
   const response = await drive.files.create({
     requestBody: {
       name: folderName,
@@ -106,6 +128,7 @@ export const createDriveFolder = async (
  * 刪除檔案或資料夾
  */
 export const deleteDriveFile = async (fileId: string) => {
+  validateDriveId(fileId, '檔案 ID');
   // 注意：delete 是永久刪除。如果你想丟進垃圾桶，要改用 update 並設定 trashed: true
   await drive.files.delete({
     fileId: fileId

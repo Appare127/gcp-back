@@ -129,7 +129,9 @@ export async function analyzeSecurityIntelCsv(
   } = {}
 ): Promise<SecurityIntelAnalysisResult> {
   const includeDetail = options.includeDetail ?? false;
-  const abuseCheckLimit = options.abuseCheckLimit ?? 50;
+  const rawLimit = options.abuseCheckLimit ?? 50;
+  const abuseCheckLimit = Math.min(Math.max(1, rawLimit), 100);
+  const maxCsvLines = 50000;
 
   // 移除可能存在的 UTF-8 BOM
   let content = fileBuffer.toString('utf-8');
@@ -138,10 +140,11 @@ export async function analyzeSecurityIntelCsv(
   }
 
   const lines = content.split(/\r?\n/);
+  const totalLinesToProcess = Math.min(lines.length, maxCsvLines);
   const result = [] as SecurityIntelSingleIpResult[];
 
-  // 解析 CSV
-  for (let i = 0; i < lines.length; i++) {
+  // 解析 CSV（限制單次最多解析 50,000 行，防止過大行數消耗記憶體與阻塞 Event Loop）
+  for (let i = 0; i < totalLinesToProcess; i++) {
     const line = lines[i]?.trim();
     if (!line) continue;
 

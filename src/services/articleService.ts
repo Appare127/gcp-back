@@ -24,8 +24,7 @@ export async function getAllArticlesService() {
       author: {
         select: {
           id: true,
-          account: true, // 我們只需要作者的名字和 ID，不需要密碼
-          email: true
+          account: true // 我們只需要作者的名字和 ID，不需要密碼
         }
       }
     },

@@ -12,11 +12,15 @@ import { Router } from 'express';
 import userRoutes from './userRoutes';
 import articleRoutes from './articleRoutes';
 import uploadRouter from './uploadRoutes';
+import resumeRoutes from './resumeRoutes';
+import healthRoutes from './healthRoutes';
 
 const router = Router();
 
 router.use('/users', userRoutes);
 router.use('/articles', articleRoutes);
 router.use('/upload', uploadRouter);
+router.use('/resume', resumeRoutes);
+router.use('/health', healthRoutes);
 
 export default router;

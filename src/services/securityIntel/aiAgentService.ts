@@ -222,13 +222,13 @@ function buildAssessmentPrompt(input: IpAnalysisInputFeatures): string {
 - 資料庫更新時間: ${firehol.lastUpdated}
 
 ③ 社群惡意檢舉歷史 (AbuseIPDB 近 90 天)
-- 查詢狀態: ${abuseIpDb.status}
-- 濫用信心指數 (Abuse Confidence Score): ${abuseIpDb.abuseConfidenceScore ?? '無紀錄'}${abuseIpDb.abuseConfidenceScore !== null ? '%' : ''}
-- 90 天檢舉總次數: ${abuseIpDb.totalReports} 次
-- 最後檢舉時間: ${abuseIpDb.lastReportedAt ?? '無'}
-- 登記用途類型: ${abuseIpDb.usageType || '未知'}
-- 登記 ISP / 網域: ${abuseIpDb.isp || '未知'} / ${abuseIpDb.domain || '未知'}
-- 白名單狀態: ${abuseIpDb.isWhitelisted === null ? '未知' : abuseIpDb.isWhitelisted ? '已列入白名單' : '未列入白名單'}
+- 查詢狀態: ${abuseIpDb?.status ?? 'not_checked'}
+- 濫用信心指數 (Abuse Confidence Score): ${abuseIpDb?.abuseConfidenceScore ?? '無紀錄'}${abuseIpDb?.abuseConfidenceScore !== null && abuseIpDb?.abuseConfidenceScore !== undefined ? '%' : ''}
+- 90 天檢舉總次數: ${abuseIpDb?.totalReports ?? 0} 次
+- 最後檢舉時間: ${abuseIpDb?.lastReportedAt ?? '無'}
+- 登記用途類型: ${abuseIpDb?.usageType || '未知'}
+- 登記 ISP / 網域: ${abuseIpDb?.isp || '未知'} / ${abuseIpDb?.domain || '未知'}
+- 白名單狀態: ${abuseIpDb?.isWhitelisted === null || abuseIpDb?.isWhitelisted === undefined ? '未知' : abuseIpDb.isWhitelisted ? '已列入白名單' : '未列入白名單'}
 
 【網路即時查詢任務 (重要必做)】
 請充分使用 Google 搜尋工具，主動查證以下情報：
@@ -301,7 +301,7 @@ function formatAiErrorMessage(err: unknown): string {
 export async function analyzeIpWithAiAgent(
   input: IpAnalysisInputFeatures
 ): Promise<IpSecurityAssessment> {
-  const cacheKey = `${input.ip}_${input.asn}_${input.firehol.isListed}_${input.abuseIpDb.abuseConfidenceScore}`;
+  const cacheKey = `${input.ip}_${input.asn}_${input.firehol.isListed}_${input.abuseIpDb?.abuseConfidenceScore ?? 'null'}`;
   const cached = getCachedAssessment(cacheKey);
   if (cached) {
     return cached;
@@ -397,7 +397,21 @@ export async function testAiAgentCommunication(
       ? options.prompt.trim()
       : '請簡短自我介紹你的角色與職責，並列出一則近期的重大網路資安威脅或防禦建議。';
 
-  const model = options.model?.trim() || 'gemini-3-flash-preview';
+  // 白名單控管允許的 Gemini 模型，避免被任意切換至高單價或無效模型
+  const allowedModels = [
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash'
+  ];
+  const requestedModel = options.model?.trim() || 'gemini-3-flash-preview';
+  if (!allowedModels.includes(requestedModel)) {
+    throw new AppError(
+      `不支援的 Gemini 模型：${requestedModel}（僅允許 ${allowedModels.join(', ')}）`,
+      400
+    );
+  }
+  const model = requestedModel;
   const initialGoogleSearch = options.enableGoogleSearch ?? true;
   const systemInstruction =
     options.systemInstruction?.trim() ||
